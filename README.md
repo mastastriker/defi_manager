@@ -51,4 +51,3 @@ Open: `http://localhost:4173`
 - Wallet connection and protocol API integration
 - Authentication and user accounts
 - Alerts and transaction history modules
-- Analytics instrumentation

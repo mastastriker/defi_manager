@@ -177,4 +177,5 @@ tableBody.addEventListener("click", (event) => {
 
 loadPositions();
 render();
+
 console.log("DEF-9 dark single-page MVP loaded");
