@@ -36,9 +36,12 @@ const initialPositions = [
     chain: "ETH",
     projectName: "Aave",
     strategyName: "USDC Lending Core",
+    collateral: "stETH",
     investedAmount: 910000,
     interestAmount: 18000,
     currentValue: 928000,
+    debtUsd: 250000,
+    borrowPayout: 246500,
     calculationMode: "interest",
     ptAmount: null,
     maturityDate: null,
@@ -104,6 +107,12 @@ const maturityField = document.getElementById("position-maturity-field");
 const maturityInput = document.getElementById("position-maturity");
 const ptAmountField = document.getElementById("position-pt-amount-field");
 const ptAmountInput = document.getElementById("position-pt-amount");
+const collateralField = document.getElementById("position-collateral-field");
+const collateralInput = document.getElementById("position-collateral");
+const debtField = document.getElementById("position-debt-field");
+const debtInput = document.getElementById("position-debt");
+const borrowPayoutField = document.getElementById("position-borrow-payout-field");
+const borrowPayoutInput = document.getElementById("position-borrow-payout");
 const investedInput = document.getElementById("position-invested");
 const interestInput = document.getElementById("position-interest");
 const currentInput = document.getElementById("position-current");
@@ -130,6 +139,18 @@ const kpiApy = document.getElementById("kpi-apy");
 const kpiCashflow = document.getElementById("kpi-cashflow");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
+const activeStrategyNameHeader = document.getElementById("active-strategy-name-header");
+const activeCollateralHeader = document.getElementById("active-collateral-header");
+const activeInterestHeader = document.getElementById("active-interest-header");
+const activeRoiHeader = document.getElementById("active-roi-header");
+const activeMonthlyCashflowHeader = document.getElementById("active-monthly-cashflow-header");
+const activeApyHeader = document.getElementById("active-apy-header");
+const activeNetApyHeader = document.getElementById("active-net-apy-header");
+const activeBorrowCostHeader = document.getElementById("active-borrow-cost-header");
+const activeBorrowApyHeader = document.getElementById("active-borrow-apy-header");
+const activeDebtHeader = document.getElementById("active-debt-header");
+const activeBorrowPayoutHeader = document.getElementById("active-borrow-payout-header");
+const activeLtvHeader = document.getElementById("active-ltv-header");
 const activePtAmountHeader = document.getElementById("active-pt-amount-header");
 const activeFixedCashflowHeader = document.getElementById("active-fixed-cashflow-header");
 const activeMaturityHeader = document.getElementById("active-maturity-header");
@@ -290,6 +311,16 @@ function normalizePosition(entry) {
     : Number.isFinite(Number(entry?.ptCount))
       ? Math.max(0, Number(entry.ptCount))
       : null;
+  const normalizedDebt = Number.isFinite(Number(entry?.debtUsd))
+    ? Math.max(0, Number(entry.debtUsd))
+    : Number.isFinite(Number(entry?.debt))
+      ? Math.max(0, Number(entry.debt))
+      : 0;
+  const normalizedBorrowPayout = Number.isFinite(Number(entry?.borrowPayout))
+    ? Math.max(0, Number(entry.borrowPayout))
+    : Number.isFinite(Number(entry?.borrowPaidOut))
+      ? Math.max(0, Number(entry.borrowPaidOut))
+      : 0;
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -313,6 +344,9 @@ function normalizePosition(entry) {
     investedAmount: normalizedInvested,
     interestAmount: computedInterest,
     currentValue: computedCurrent,
+    collateral: typeof entry?.collateral === "string" ? entry.collateral.trim() : "",
+    debtUsd: normalizedDebt,
+    borrowPayout: normalizedBorrowPayout,
     calculationMode: normalizedCalculationMode,
     ptAmount: normalizedPtAmount,
     maturityDate: normalizedMaturityDate,
@@ -502,6 +536,49 @@ function computeMonthlyCashflow(entry) {
   return computeObservedMonthlyCashflow(entry);
 }
 
+function computeBorrowCost(entry) {
+  const debt = Number(entry.debtUsd || 0);
+  const payout = Number(entry.borrowPayout || 0);
+  return Math.max(0, debt - payout);
+}
+
+function computeBorrowApy(entry) {
+  const debt = Number(entry.debtUsd || 0);
+  if (debt <= 0) {
+    return 0;
+  }
+  const startDate = parsePositionDate(entry.date);
+  if (!startDate) {
+    return 0;
+  }
+  const now = new Date();
+  const elapsedMs = now.getTime() - startDate.getTime();
+  const elapsedHours = elapsedMs / MS_PER_HOUR;
+  const elapsedMonths = elapsedHours / HOURS_PER_MONTH;
+  if (!Number.isFinite(elapsedMonths) || elapsedMonths <= 0) {
+    return 0;
+  }
+  const monthlyBorrowCost = computeBorrowCost(entry) / elapsedMonths;
+  const monthlyRate = monthlyBorrowCost / debt;
+  if (!Number.isFinite(monthlyRate) || monthlyRate <= -1) {
+    return 0;
+  }
+  const annualized = (Math.pow(1 + monthlyRate, 12) - 1) * 100;
+  return Number.isFinite(annualized) ? Math.max(-100, Math.min(annualized, 10000)) : 0;
+}
+
+function computeNetApy(entry) {
+  return computeApyAnnual(entry) - computeBorrowApy(entry);
+}
+
+function computeLtv(entry) {
+  const current = Number(entry.currentValue || 0);
+  if (current <= 0) {
+    return 0;
+  }
+  return (Number(entry.debtUsd || 0) / current) * 100;
+}
+
 function computeRoiAtMaturity(entry) {
   return Number(entry.ptAmount ?? 0) - Number(entry.investedAmount || 0);
 }
@@ -558,70 +635,49 @@ function isMaturityColumnVisible() {
   return activeTab === "pendle";
 }
 
-function updateActiveTableColumns() {
-  const showMaturity = isMaturityColumnVisible();
-  if (activePtAmountHeader) {
-    activePtAmountHeader.hidden = !showMaturity;
-    const ptAmountButton = activePtAmountHeader.querySelector(".sort-btn");
-    if (ptAmountButton instanceof HTMLButtonElement) {
-      ptAmountButton.disabled = !showMaturity;
-      ptAmountButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
-    }
-  }
-  if (activeFixedCashflowHeader) {
-    activeFixedCashflowHeader.hidden = !showMaturity;
-    const fixedCashflowButton = activeFixedCashflowHeader.querySelector(".sort-btn");
-    if (fixedCashflowButton instanceof HTMLButtonElement) {
-      fixedCashflowButton.disabled = !showMaturity;
-      fixedCashflowButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
-    }
-  }
-  if (!activeMaturityHeader) {
-    if (activeRoiMaturityHeader) {
-      activeRoiMaturityHeader.hidden = !showMaturity;
-      const roiMaturityButton = activeRoiMaturityHeader.querySelector(".sort-btn");
-      if (roiMaturityButton instanceof HTMLButtonElement) {
-        roiMaturityButton.disabled = !showMaturity;
-        roiMaturityButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
-      }
-    }
-    if (activeNotesHeader) {
-      activeNotesHeader.hidden = showMaturity;
-      const notesButton = activeNotesHeader.querySelector(".sort-btn");
-      if (notesButton instanceof HTMLButtonElement) {
-        notesButton.disabled = showMaturity;
-        notesButton.setAttribute("aria-hidden", showMaturity ? "true" : "false");
-      }
-    }
+function isLendingColumnVisible() {
+  return activeTab === "lending";
+}
+
+function toggleHeaderVisibility(header, visible) {
+  if (!header) {
     return;
   }
-
-  activeMaturityHeader.hidden = !showMaturity;
-  const maturityButton = activeMaturityHeader.querySelector(".sort-btn");
-  if (maturityButton instanceof HTMLButtonElement) {
-    maturityButton.disabled = !showMaturity;
-    maturityButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
-  }
-  if (activeRoiMaturityHeader) {
-    activeRoiMaturityHeader.hidden = !showMaturity;
-    const roiMaturityButton = activeRoiMaturityHeader.querySelector(".sort-btn");
-    if (roiMaturityButton instanceof HTMLButtonElement) {
-      roiMaturityButton.disabled = !showMaturity;
-      roiMaturityButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
-    }
-  }
-  if (activeNotesHeader) {
-    activeNotesHeader.hidden = showMaturity;
-    const notesButton = activeNotesHeader.querySelector(".sort-btn");
-    if (notesButton instanceof HTMLButtonElement) {
-      notesButton.disabled = showMaturity;
-      notesButton.setAttribute("aria-hidden", showMaturity ? "true" : "false");
-    }
+  header.hidden = !visible;
+  const button = header.querySelector(".sort-btn");
+  if (button instanceof HTMLButtonElement) {
+    button.disabled = !visible;
+    button.setAttribute("aria-hidden", visible ? "false" : "true");
   }
 }
 
-function syncMaturityField(positionType) {
+function updateActiveTableColumns() {
+  const showMaturity = isMaturityColumnVisible();
+  const showLending = isLendingColumnVisible();
+  const showClassic = !showMaturity && !showLending;
+
+  toggleHeaderVisibility(activeStrategyNameHeader, showClassic || showMaturity);
+  toggleHeaderVisibility(activeCollateralHeader, showLending);
+  toggleHeaderVisibility(activeInterestHeader, showClassic || showMaturity);
+  toggleHeaderVisibility(activeRoiHeader, showClassic || showMaturity);
+  toggleHeaderVisibility(activeMonthlyCashflowHeader, showClassic || showMaturity);
+  toggleHeaderVisibility(activeFixedCashflowHeader, showMaturity);
+  toggleHeaderVisibility(activeApyHeader, showClassic || showMaturity);
+  toggleHeaderVisibility(activeNetApyHeader, showLending);
+  toggleHeaderVisibility(activeBorrowCostHeader, showLending);
+  toggleHeaderVisibility(activeBorrowApyHeader, showLending);
+  toggleHeaderVisibility(activeDebtHeader, showLending);
+  toggleHeaderVisibility(activeBorrowPayoutHeader, showLending);
+  toggleHeaderVisibility(activeLtvHeader, showLending);
+  toggleHeaderVisibility(activePtAmountHeader, showMaturity);
+  toggleHeaderVisibility(activeRoiMaturityHeader, showMaturity);
+  toggleHeaderVisibility(activeMaturityHeader, showMaturity);
+  toggleHeaderVisibility(activeNotesHeader, showClassic);
+}
+
+function syncTypeSpecificFields(positionType) {
   const isPendle = positionType === "pendle";
+  const isLending = positionType === "lending";
   if (maturityField) {
     maturityField.hidden = !isPendle;
   }
@@ -633,6 +689,26 @@ function syncMaturityField(positionType) {
   }
   if (!isPendle && ptAmountInput) {
     ptAmountInput.value = "";
+  }
+  if (collateralField) {
+    collateralField.hidden = !isLending;
+  }
+  if (debtField) {
+    debtField.hidden = !isLending;
+  }
+  if (borrowPayoutField) {
+    borrowPayoutField.hidden = !isLending;
+  }
+  if (!isLending) {
+    if (collateralInput) {
+      collateralInput.value = "";
+    }
+    if (debtInput) {
+      debtInput.value = "";
+    }
+    if (borrowPayoutInput) {
+      borrowPayoutInput.value = "";
+    }
   }
 }
 
@@ -691,6 +767,7 @@ function getSortValue(entry, key) {
     }
     case "projectName":
     case "strategyName":
+    case "collateral":
     case "notes":
       return String(entry[key] || "");
     case "maturityDate": {
@@ -713,6 +790,18 @@ function getSortValue(entry, key) {
       return computeFixedMonthlyCashflow(entry);
     case "apyAnnual":
       return computeApyAnnual(entry);
+    case "netApy":
+      return computeNetApy(entry);
+    case "borrowCost":
+      return computeBorrowCost(entry);
+    case "borrowApy":
+      return computeBorrowApy(entry);
+    case "debtUsd":
+      return Number(entry.debtUsd || 0);
+    case "borrowPayout":
+      return Number(entry.borrowPayout || 0);
+    case "ltv":
+      return computeLtv(entry);
     case "archivedAt": {
       const archivedDate = entry.archivedAt ? new Date(entry.archivedAt) : null;
       return archivedDate && !Number.isNaN(archivedDate.getTime()) ? archivedDate.getTime() : 0;
@@ -775,7 +864,8 @@ function renderActiveTable() {
   const rows = sortRows(filteredActivePositions(), "active");
   const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
   const showMaturity = isMaturityColumnVisible();
-  const tableColspan = showMaturity ? 16 : 13;
+  const showLending = isLendingColumnVisible();
+  const tableColspan = showMaturity ? 16 : showLending ? 14 : 13;
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
@@ -794,18 +884,24 @@ function renderActiveTable() {
         <td>${escapeHtml(row.wallet)}</td>
         <td>${escapeHtml(row.chain)}</td>
         <td>${escapeHtml(row.projectName)}</td>
-        <td>${escapeHtml(row.strategyName)}</td>
+        ${showLending ? `<td>${escapeHtml(row.collateral || "-")}</td>` : `<td>${escapeHtml(row.strategyName)}</td>`}
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
-        <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
-        <td>${roiDisplay(row)}</td>
-        <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
+        ${showLending ? "" : `<td>${formatCurrency(Number(row.interestAmount || 0))}</td>`}
+        ${showLending ? "" : `<td>${roiDisplay(row)}</td>`}
+        ${showLending ? "" : `<td>${formatCurrency(computeMonthlyCashflow(row))}</td>`}
         ${showMaturity ? `<td>${formatCurrency(computeFixedMonthlyCashflow(row))}</td>` : ""}
-        <td>${formatPercent(computeApyAnnual(row))}</td>
+        ${showLending ? "" : `<td>${formatPercent(computeApyAnnual(row))}</td>`}
+        ${showLending ? `<td>${formatPercent(computeNetApy(row))}</td>` : ""}
+        ${showLending ? `<td>${formatCurrency(computeBorrowCost(row))}</td>` : ""}
+        ${showLending ? `<td>${formatPercent(computeBorrowApy(row))}</td>` : ""}
+        ${showLending ? `<td>${formatCurrency(Number(row.debtUsd || 0))}</td>` : ""}
+        ${showLending ? `<td>${formatCurrency(Number(row.borrowPayout || 0))}</td>` : ""}
+        ${showLending ? `<td>${formatPercent(computeLtv(row))}</td>` : ""}
         ${showMaturity ? `<td>${formatQuantity(row.ptAmount)}</td>` : ""}
         ${showMaturity ? `<td>${formatCurrency(computeRoiAtMaturity(row))}</td>` : ""}
         ${showMaturity ? `<td>${formatDate(row.maturityDate)}</td>` : ""}
-        ${showMaturity ? "" : `<td>${escapeHtml(row.notes || "-")}</td>`}
+        ${showMaturity || showLending ? "" : `<td>${escapeHtml(row.notes || "-")}</td>`}
         <td>
           <div class="row-actions">
             <button type="button" class="edit-btn" data-id="${row.id}">Bearbeiten</button>
@@ -877,7 +973,7 @@ function setActiveTab(nextTab) {
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
   });
   if (!editingPositionId) {
-    syncMaturityField(nextTab);
+    syncTypeSpecificFields(nextTab);
   }
   if (nextTab === "pendle" && sortState.active.key === "notes") {
     sortState.active.key = null;
@@ -888,6 +984,18 @@ function setActiveTab(nextTab) {
       sortState.active.key === "ptAmount" ||
       sortState.active.key === "roiAtMaturity" ||
       sortState.active.key === "fixedMonthlyCashflow")
+  ) {
+    sortState.active.key = null;
+  }
+  if (
+    nextTab !== "lending" &&
+    (sortState.active.key === "collateral" ||
+      sortState.active.key === "netApy" ||
+      sortState.active.key === "borrowCost" ||
+      sortState.active.key === "borrowApy" ||
+      sortState.active.key === "debtUsd" ||
+      sortState.active.key === "borrowPayout" ||
+      sortState.active.key === "ltv")
   ) {
     sortState.active.key = null;
   }
@@ -934,7 +1042,7 @@ function resetFormMode() {
   walletInput.value = fallbackWallet();
   chainInput.value = DEFAULT_CHAIN;
   dateInput.value = localDateTimeNowHour();
-  syncMaturityField(activeTab);
+  syncTypeSpecificFields(activeTab);
   syncCalculationInputs();
   setFormMode(false);
 }
@@ -1038,6 +1146,9 @@ form.addEventListener("submit", (event) => {
     investedAmount: Number(investedInput.value),
     interestAmount: 0,
     currentValue: 0,
+    collateral: "",
+    debtUsd: 0,
+    borrowPayout: 0,
     calculationMode: "interest",
     ptAmount: null,
     maturityDate: null,
@@ -1069,6 +1180,29 @@ form.addEventListener("submit", (event) => {
       return;
     }
     next.ptAmount = ptAmount;
+  }
+  if (next.type === "lending") {
+    next.collateral = collateralInput?.value.trim() || "";
+    if (!next.collateral) {
+      setStatus("Collateral ist fuer Lending/Borrow Positionen erforderlich.");
+      return;
+    }
+    const debt = parseOptionalNumber(debtInput?.value || "");
+    if (debt !== null) {
+      if (Number.isNaN(debt) || debt < 0) {
+        setStatus("Schulden in $ muessen eine nicht-negative Zahl sein.");
+        return;
+      }
+      next.debtUsd = debt;
+    }
+    const borrowPayout = parseOptionalNumber(borrowPayoutInput?.value || "");
+    if (borrowPayout !== null) {
+      if (Number.isNaN(borrowPayout) || borrowPayout < 0) {
+        setStatus("Borrow Ausgezahlt muss eine nicht-negative Zahl sein.");
+        return;
+      }
+      next.borrowPayout = borrowPayout;
+    }
   }
 
   if (!next.strategyName) {
@@ -1178,6 +1312,15 @@ tableBody.addEventListener("click", (event) => {
     strategyNameInput.value = position.strategyName;
     ptAmountInput.value = position.ptAmount === null || position.ptAmount === undefined ? "" : String(position.ptAmount);
     maturityInput.value = normalizeDateTimeValue(position.maturityDate || "") || "";
+    if (collateralInput) {
+      collateralInput.value = position.collateral || "";
+    }
+    if (debtInput) {
+      debtInput.value = Number(position.debtUsd || 0) > 0 ? String(position.debtUsd) : "";
+    }
+    if (borrowPayoutInput) {
+      borrowPayoutInput.value = Number(position.borrowPayout || 0) > 0 ? String(position.borrowPayout) : "";
+    }
     investedInput.value = String(position.investedAmount);
     if (position.calculationMode === "current") {
       currentInput.value = String(Number(position.currentValue || 0));
@@ -1187,7 +1330,7 @@ tableBody.addEventListener("click", (event) => {
       currentInput.value = "";
     }
     notesInput.value = position.notes || "";
-    syncMaturityField(position.type);
+    syncTypeSpecificFields(position.type);
     syncCalculationInputs();
     setFormMode(true);
     setStatus("Position wird bearbeitet.");

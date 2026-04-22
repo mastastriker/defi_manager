@@ -80,6 +80,18 @@
               PT-Anzahl (nur PT)
               <input id="position-pt-amount" type="number" min="0" step="0.000001" placeholder="12.5" />
             </label>
+            <label id="position-collateral-field">
+              Collateral (nur Lending/Borrow)
+              <input id="position-collateral" type="text" maxlength="64" placeholder="ETH, BTC, stETH" />
+            </label>
+            <label id="position-debt-field">
+              Schulden in $ (nur Lending/Borrow)
+              <input id="position-debt" type="number" min="0" step="0.01" placeholder="25000" />
+            </label>
+            <label id="position-borrow-payout-field">
+              Borrow Ausgezahlt (nur Lending/Borrow)
+              <input id="position-borrow-payout" type="number" min="0" step="0.01" placeholder="24800" />
+            </label>
             <label>
               Eingezahlter Betrag (USD)
               <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
@@ -138,15 +150,21 @@
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
-                  <th data-sort-table="active" data-sort-key="strategyName" aria-sort="none">
+                  <th id="active-strategy-name-header" data-sort-table="active" data-sort-key="strategyName" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="strategyName">
                       Name der Strategie
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
+                  <th id="active-collateral-header" data-sort-table="active" data-sort-key="collateral" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="collateral">
+                      Collateral
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
                   <th data-sort-table="active" data-sort-key="investedAmount" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="investedAmount">
-                      Eingezahlter Betrag
+                      Eingezahlt
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
@@ -156,19 +174,19 @@
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
-                  <th data-sort-table="active" data-sort-key="interestAmount" aria-sort="none">
+                  <th id="active-interest-header" data-sort-table="active" data-sort-key="interestAmount" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="interestAmount">
                       Zinsen
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
-                  <th data-sort-table="active" data-sort-key="roiPercent" aria-sort="none">
+                  <th id="active-roi-header" data-sort-table="active" data-sort-key="roiPercent" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="roiPercent">
                       Aktuelles ROI in % und Dollar
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
-                  <th data-sort-table="active" data-sort-key="monthlyCashflow" aria-sort="none">
+                  <th id="active-monthly-cashflow-header" data-sort-table="active" data-sort-key="monthlyCashflow" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="monthlyCashflow">
                       Cashflow pro Monat
                       <span class="sort-indicator" aria-hidden="true"></span>
@@ -180,9 +198,45 @@
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
-                  <th data-sort-table="active" data-sort-key="apyAnnual" aria-sort="none">
+                  <th id="active-apy-header" data-sort-table="active" data-sort-key="apyAnnual" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="apyAnnual">
                       APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-net-apy-header" data-sort-table="active" data-sort-key="netApy" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="netApy">
+                      NetAPY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-cost-header" data-sort-table="active" data-sort-key="borrowCost" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowCost">
+                      Borrow Cost
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-apy-header" data-sort-table="active" data-sort-key="borrowApy" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowApy">
+                      Borrow APY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-debt-header" data-sort-table="active" data-sort-key="debtUsd" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="debtUsd">
+                      Schulden in $
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-payout-header" data-sort-table="active" data-sort-key="borrowPayout" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowPayout">
+                      Borrow Ausgezahlt
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-ltv-header" data-sort-table="active" data-sort-key="ltv" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="ltv">
+                      LTV
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
