@@ -22,6 +22,7 @@
     <nav class="shell top-nav" aria-label="Seitennavigation">
       <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
       <button type="button" class="page-tab" data-page-target="archive">Archiv</button>
+      <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
     </nav>
 
     <main class="shell">
@@ -40,6 +41,10 @@
             <article>
               <p class="label">Durchschnittliches APY</p>
               <p id="kpi-apy" class="value">0.00%</p>
+            </article>
+            <article>
+              <p class="label">Cashflow pro Monat</p>
+              <p id="kpi-cashflow" class="value">$0</p>
             </article>
           </div>
         </section>
@@ -61,11 +66,16 @@
             </label>
             <label>
               Wallet
-              <input id="position-wallet" type="text" maxlength="40" placeholder="Ledger 1" />
+              <select id="position-wallet" required></select>
             </label>
             <label>
-              Chain
-              <input id="position-chain" type="text" maxlength="24" placeholder="ETH" />
+              Chains
+              <select id="position-chain" required>
+                <option value="ETH">ETH</option>
+                <option value="BASE">BASE</option>
+                <option value="ARB">ARB</option>
+                <option value="AVAX">AVAX</option>
+              </select>
             </label>
             <label>
               Projektname
@@ -278,6 +288,22 @@
               <tbody id="archived-body"></tbody>
             </table>
           </div>
+        </section>
+      </section>
+
+      <section id="wallets-page" class="page-section" aria-label="Walletverwaltung" hidden>
+        <section class="panel" aria-label="Wallets">
+          <h2>Wallets</h2>
+          <p class="meta-note">Wallets verwalten, die in der Positionserfassung als Auswahl erscheinen.</p>
+          <form id="wallet-form" class="wallet-form">
+            <label>
+              Wallet-Name
+              <input id="wallet-name" type="text" maxlength="40" placeholder="Cash3" required />
+            </label>
+            <button type="submit" class="btn-primary">Wallet hinzufügen</button>
+          </form>
+          <p id="wallet-status" class="form-status" role="status" aria-live="polite"></p>
+          <ul id="wallet-list" class="wallet-list"></ul>
         </section>
       </section>
     </main>

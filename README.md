@@ -6,7 +6,8 @@ This repository implements DEF-9 board-scoped v1:
 - Hero + KPI summary + positions table (strict scope)
 - Manual position entry only
 - Browser `localStorage` persistence with migration-safe backup
-- No wallet integration, auth, analytics, alerts, or transactions in v1
+- Wallet management page with add/delete and dropdown selection in position form
+- No auth, analytics, alerts, or transactions in v1
 
 ## Run locally
 
@@ -27,12 +28,20 @@ Open: `http://localhost:4173`
 ## Manual-entry and persistence flow
 
 1. Use the `Manual Position Entry` form to add a position.
-2. Enter `Zinsen (USD)` when available.
-3. `Aktueller Wert` is automatically calculated as `Eingezahlt + Zinsen`.
-4. Position appears in the table and KPI totals update immediately.
-5. Reload the page.
-6. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
-7. Delete a row to remove it and persist the removal.
+2. Wallets are selected from the managed wallet dropdown (`Cash1` and `Cash2` defaults).
+3. Enter `Zinsen (USD)` when available.
+4. `Aktueller Wert` is automatically calculated as `Eingezahlt + Zinsen`.
+5. Position appears in the table and KPI totals update immediately.
+6. Reload the page.
+7. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
+8. Delete a row to remove it and persist the removal.
+
+## Wallet flow (DEF-55)
+
+1. Open `Wallets` page in top navigation (next to `Archiv`).
+2. Add a wallet via `Wallet-Name`.
+3. Delete wallets only when they are not used by existing positions.
+4. Return to `Dashboard` and confirm wallet dropdown includes new wallets.
 
 ## Archive flow (DEF-30)
 
