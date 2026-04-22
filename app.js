@@ -8,9 +8,9 @@ const STORAGE_VERSION = 2;
 const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
 const TYPE_LABELS = {
-  lending: "Kreditvergabe",
-  pendle: "Pendle PT",
-  strategy: "Strategie"
+  lending: "Lending/Borrow Positionen",
+  pendle: "PT Strategien",
+  strategy: "Klassische Yield Strategien"
 };
 
 const VALID_TYPES = new Set(["lending", "pendle", "strategy"]);
@@ -72,7 +72,7 @@ const initialPositions = [
 
 let positions = [];
 let wallets = [];
-let activeTab = "all";
+let activeTab = "strategy";
 let editingPositionId = null;
 let activePage = "dashboard";
 const sortState = {
@@ -81,7 +81,6 @@ const sortState = {
 };
 
 const form = document.getElementById("position-form");
-const typeInput = document.getElementById("position-type");
 const dateInput = document.getElementById("position-date");
 const walletInput = document.getElementById("position-wallet");
 const chainInput = document.getElementById("position-chain");
@@ -451,11 +450,7 @@ function renderWalletList() {
 }
 
 function filteredActivePositions() {
-  const active = activePositions();
-  if (activeTab === "all") {
-    return active;
-  }
-  return active.filter((entry) => entry.type === activeTab);
+  return activePositions().filter((entry) => entry.type === activeTab);
 }
 
 function getSortValue(entry, key) {
@@ -678,7 +673,6 @@ function setFormMode(isEditMode) {
 function resetFormMode() {
   editingPositionId = null;
   form.reset();
-  typeInput.value = "lending";
   walletInput.value = fallbackWallet();
   chainInput.value = DEFAULT_CHAIN;
   const today = new Date().toISOString().slice(0, 10);
@@ -773,10 +767,11 @@ sortableHeaders.forEach((header) => {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  const editingPosition = editingPositionId ? positions.find((entry) => entry.id === editingPositionId) : null;
 
   const next = {
     id: crypto.randomUUID(),
-    type: typeInput.value,
+    type: editingPosition?.type || activeTab,
     date: dateInput.value,
     wallet: walletInput.value,
     chain: chainInput.value,
@@ -898,7 +893,6 @@ tableBody.addEventListener("click", (event) => {
     }
 
     editingPositionId = id;
-    typeInput.value = position.type;
     dateInput.value = position.date;
     walletInput.value = position.wallet;
     chainInput.value = position.chain;

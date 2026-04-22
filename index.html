@@ -48,14 +48,6 @@
           <h2>Manuelle Positionserfassung</h2>
           <form id="position-form" class="entry-form">
             <label>
-              Typ
-              <select id="position-type" required>
-                <option value="lending">Kreditvergabe</option>
-                <option value="pendle">Pendle PT</option>
-                <option value="strategy">Strategie</option>
-              </select>
-            </label>
-            <label>
               Datum
               <input id="position-date" type="date" required />
             </label>
@@ -105,10 +97,9 @@
         <section class="panel" aria-label="Aktive Positionstabelle">
           <h2>Aktive Positionen <span id="active-positions-total" class="heading-count">(0)</span></h2>
           <div class="tabs" role="tablist" aria-label="Positions-Typ-Tabs">
-            <button type="button" class="tab active" data-tab="all" role="tab" aria-selected="true">Alle</button>
-            <button type="button" class="tab" data-tab="lending" role="tab" aria-selected="false">Kreditvergabe</button>
-            <button type="button" class="tab" data-tab="pendle" role="tab" aria-selected="false">Pendle PT</button>
-            <button type="button" class="tab" data-tab="strategy" role="tab" aria-selected="false">Strategien</button>
+            <button type="button" class="tab active" data-tab="strategy" role="tab" aria-selected="true">Klassische Yield Strategien</button>
+            <button type="button" class="tab" data-tab="pendle" role="tab" aria-selected="false">PT Strategien</button>
+            <button type="button" class="tab" data-tab="lending" role="tab" aria-selected="false">Lending/Borrow Positionen</button>
           </div>
 
           <div class="table-wrap">
