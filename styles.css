@@ -181,6 +181,10 @@ main {
   font-size: 0.82rem;
 }
 
+.entry-form label[hidden] {
+  display: none;
+}
+
 input,
 select {
   width: 100%;

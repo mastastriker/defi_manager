@@ -1062,6 +1062,7 @@ function setActiveTab(nextTab) {
     sortState.active.key = null;
   }
   updateActiveTableColumns();
+  updatePositionCountLabel();
   updateSortUi();
   renderActiveTable();
 }
