@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DeFi Portfolio Dashboard | DEF-9 MVP</title>
+    <title>DeFi-Portfolio-Dashboard | DEF-9 MVP</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -12,92 +12,153 @@
 
     <header class="hero shell">
       <p class="eyebrow">DEF-9 MVP</p>
-      <h1>DeFi Portfolio Command Center</h1>
+      <h1>DeFi-Portfolio-Kommandozentrale</h1>
       <p class="subtitle">
-        Single-page dashboard for manual DeFi position tracking across Lending, Pendle PT, and Strategy books.
+        Einseitiges Dashboard zur manuellen DeFi-Positionsverwaltung über Kreditvergabe, Pendle PT und Strategiebücher.
       </p>
-      <p class="meta-note">Local-only mode. No wallet auth, analytics, or external integrations in v1.</p>
+      <p class="meta-note">Nur lokaler Modus. Keine Wallet-Authentifizierung, Analysen oder externen Integrationen in v1.</p>
     </header>
 
+    <nav class="shell top-nav" aria-label="Seitennavigation">
+      <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
+      <button type="button" class="page-tab" data-page-target="archive">Archiv</button>
+    </nav>
+
     <main class="shell">
-      <section class="panel" aria-label="Portfolio KPI summary">
-        <h2>Portfolio KPI Summary</h2>
-        <div class="kpi-grid">
-          <article>
-            <p class="label">Total Positions</p>
-            <p id="kpi-count" class="value">0</p>
-          </article>
-          <article>
-            <p class="label">Total Notional</p>
-            <p id="kpi-notional" class="value">$0</p>
-          </article>
-          <article>
-            <p class="label">Average Yield</p>
-            <p id="kpi-yield" class="value">0.00%</p>
-          </article>
-        </div>
+      <section id="dashboard-page" class="page-section is-active" aria-label="Dashboard">
+        <section class="panel" aria-label="Portfolio-KPI-Übersicht">
+          <h2>Portfolio-KPI-Übersicht</h2>
+          <div class="kpi-grid">
+            <article>
+              <p class="label">Positionen gesamt</p>
+              <p id="kpi-count" class="value">0</p>
+            </article>
+            <article>
+              <p class="label">Aktueller Wert gesamt</p>
+              <p id="kpi-current" class="value">$0</p>
+            </article>
+            <article>
+              <p class="label">Durchschnittliches APY</p>
+              <p id="kpi-apy" class="value">0.00%</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="Manuelle Positionserfassung">
+          <h2>Manuelle Positionserfassung</h2>
+          <form id="position-form" class="entry-form">
+            <label>
+              Typ
+              <select id="position-type" required>
+                <option value="lending">Kreditvergabe</option>
+                <option value="pendle">Pendle PT</option>
+                <option value="strategy">Strategie</option>
+              </select>
+            </label>
+            <label>
+              Datum
+              <input id="position-date" type="date" required />
+            </label>
+            <label>
+              Wallet
+              <input id="position-wallet" type="text" maxlength="40" placeholder="Ledger 1" />
+            </label>
+            <label>
+              Chain
+              <input id="position-chain" type="text" maxlength="24" placeholder="ETH" />
+            </label>
+            <label>
+              Projektname
+              <input id="position-project" type="text" maxlength="48" placeholder="Pendle" />
+            </label>
+            <label>
+              Name der Strategie
+              <input id="position-strategy-name" type="text" maxlength="80" placeholder="PT-ETH Dec 2026" required />
+            </label>
+            <label>
+              Eingezahlter Betrag (USD)
+              <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
+            </label>
+            <label>
+              Aktueller Wert (USD)
+              <input id="position-current-value" type="number" min="0" step="0.01" placeholder="102500" required />
+            </label>
+            <label class="span-full">
+              Notizen
+              <input id="position-notes" type="text" maxlength="240" placeholder="Freitext-Notiz zur Position" />
+            </label>
+            <button type="submit" class="btn-primary">Position hinzufügen</button>
+          </form>
+          <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="panel" aria-label="Aktive Positionstabelle">
+          <h2>Aktive Positionen</h2>
+          <div class="tabs" role="tablist" aria-label="Positions-Typ-Tabs">
+            <button type="button" class="tab active" data-tab="all" role="tab" aria-selected="true">Alle</button>
+            <button type="button" class="tab" data-tab="lending" role="tab" aria-selected="false">Kreditvergabe</button>
+            <button type="button" class="tab" data-tab="pendle" role="tab" aria-selected="false">Pendle PT</button>
+            <button type="button" class="tab" data-tab="strategy" role="tab" aria-selected="false">Strategien</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Datum</th>
+                  <th>Wallet</th>
+                  <th>Chain</th>
+                  <th>Projektname</th>
+                  <th>Name der Strategie</th>
+                  <th>Eingezahlter Betrag</th>
+                  <th>Aktueller Wert</th>
+                  <th>Aktuelles ROI in % und Dollar</th>
+                  <th>Cashflow pro Monat</th>
+                  <th>APY aufs Jahr gesehen</th>
+                  <th>Notizen</th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody id="positions-body"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
-      <section class="panel" aria-label="Manual position entry">
-        <h2>Manual Position Entry</h2>
-        <form id="position-form" class="entry-form">
-          <label>
-            Type
-            <select id="position-type" required>
-              <option value="lending">Lending</option>
-              <option value="pendle">Pendle PT</option>
-              <option value="strategy">Strategy</option>
-            </select>
-          </label>
-          <label>
-            Name
-            <input id="position-name" type="text" maxlength="64" placeholder="Aave v3 USDC" required />
-          </label>
-          <label>
-            Notional (USD)
-            <input id="position-notional" type="number" min="0" step="0.01" placeholder="100000" required />
-          </label>
-          <label>
-            Yield %
-            <input id="position-yield" type="number" step="0.01" placeholder="6.25" required />
-          </label>
-          <button type="submit" class="btn-primary">Add Position</button>
-        </form>
-        <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
-      </section>
-
-      <section class="panel" aria-label="Positions table">
-        <h2>Positions Table</h2>
-        <div class="tabs" role="tablist" aria-label="Position type tabs">
-          <button type="button" class="tab active" data-tab="all" role="tab" aria-selected="true">All</button>
-          <button type="button" class="tab" data-tab="lending" role="tab" aria-selected="false">Lending</button>
-          <button type="button" class="tab" data-tab="pendle" role="tab" aria-selected="false">Pendle PT</button>
-          <button type="button" class="tab" data-tab="strategy" role="tab" aria-selected="false">Strategies</button>
-        </div>
-
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Name</th>
-                <th>Notional</th>
-                <th>Yield</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="positions-body"></tbody>
-          </table>
-        </div>
+      <section id="archive-page" class="page-section" aria-label="Archivseite" hidden>
+        <section class="panel" aria-label="Archivierte Positionen">
+          <h2>Archiv</h2>
+          <p class="meta-note">Hier liegen archivierte Positionen getrennt von den aktiven Positionen im Dashboard.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Datum</th>
+                  <th>Wallet</th>
+                  <th>Chain</th>
+                  <th>Projektname</th>
+                  <th>Name der Strategie</th>
+                  <th>Eingezahlter Betrag</th>
+                  <th>Aktueller Wert</th>
+                  <th>Aktuelles ROI in % und Dollar</th>
+                  <th>Cashflow pro Monat</th>
+                  <th>APY aufs Jahr gesehen</th>
+                  <th>Notizen</th>
+                  <th>Archiviert am</th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody id="archived-body"></tbody>
+            </table>
+          </div>
+        </section>
       </section>
     </main>
 
     <footer class="shell">
-      <small>DEF-9: dark single-page MVP, manual entry + localStorage persistence</small>
+      <small>DEF-9: dunkles Einseiten-MVP, manuelle Erfassung + localStorage-Persistenz</small>
     </footer>
 
     <script src="app.js"></script>
   </body>
-
 </html>
-
