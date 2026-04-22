@@ -160,7 +160,7 @@ main {
 
 .entry-form {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
   align-items: end;
 }
@@ -190,6 +190,11 @@ select {
   font-weight: 700;
   padding: 0.65rem 0.8rem;
   cursor: pointer;
+}
+
+.entry-form .span-full,
+.entry-form .btn-primary {
+  grid-column: 1 / -1;
 }
 
 .form-status {
@@ -228,7 +233,7 @@ select {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 620px;
+  min-width: 1560px;
 }
 
 th,
@@ -304,10 +309,6 @@ footer {
 @media (max-width: 940px) {
   .entry-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .entry-form .btn-primary {
-    grid-column: 1 / -1;
   }
 }
 

@@ -1,4 +1,5 @@
 const STORAGE_KEY = "defi-dashboard-positions-v1";
+
 const TYPE_LABELS = {
   lending: "Kreditvergabe",
   pendle: "Pendle PT",
@@ -9,9 +10,48 @@ const VALID_TYPES = new Set(["lending", "pendle", "strategy"]);
 const VALID_STATUSES = new Set(["active", "archived"]);
 
 const initialPositions = [
-  { id: crypto.randomUUID(), type: "lending", name: "Aave v3 USDC", notional: 910000, yield: 6.2, status: "active", archivedAt: null },
-  { id: crypto.randomUUID(), type: "pendle", name: "PT-ETH Dec 2026", notional: 310000, yield: 17.1, status: "active", archivedAt: null },
-  { id: crypto.randomUUID(), type: "strategy", name: "Stablecoin-Basis-Loop", notional: 220000, yield: 11.4, status: "active", archivedAt: null }
+  {
+    id: crypto.randomUUID(),
+    type: "lending",
+    date: "2026-01-10",
+    wallet: "Ledger 1",
+    chain: "ETH",
+    projectName: "Aave",
+    strategyName: "USDC Lending Core",
+    investedAmount: 910000,
+    currentValue: 928000,
+    notes: "Blue-chip lending baseline",
+    status: "active",
+    archivedAt: null
+  },
+  {
+    id: crypto.randomUUID(),
+    type: "pendle",
+    date: "2026-02-14",
+    wallet: "Safe Treasury",
+    chain: "ARB",
+    projectName: "Pendle",
+    strategyName: "PT-ETH Dec 2026",
+    investedAmount: 310000,
+    currentValue: 334500,
+    notes: "Seasonal convexity thesis",
+    status: "active",
+    archivedAt: null
+  },
+  {
+    id: crypto.randomUUID(),
+    type: "strategy",
+    date: "2026-03-02",
+    wallet: "Hot Wallet",
+    chain: "BASE",
+    projectName: "Morpho",
+    strategyName: "Stablecoin Basis Loop",
+    investedAmount: 220000,
+    currentValue: 229500,
+    notes: "Low-vol carry",
+    status: "active",
+    archivedAt: null
+  }
 ];
 
 let positions = [];
@@ -21,9 +61,14 @@ let activePage = "dashboard";
 
 const form = document.getElementById("position-form");
 const typeInput = document.getElementById("position-type");
-const nameInput = document.getElementById("position-name");
-const notionalInput = document.getElementById("position-notional");
-const yieldInput = document.getElementById("position-yield");
+const dateInput = document.getElementById("position-date");
+const walletInput = document.getElementById("position-wallet");
+const chainInput = document.getElementById("position-chain");
+const projectInput = document.getElementById("position-project");
+const strategyNameInput = document.getElementById("position-strategy-name");
+const investedInput = document.getElementById("position-invested");
+const currentValueInput = document.getElementById("position-current-value");
+const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
 const tableBody = document.getElementById("positions-body");
 const archivedBody = document.getElementById("archived-body");
@@ -35,15 +80,29 @@ const pageSections = {
 };
 
 const kpiCount = document.getElementById("kpi-count");
-const kpiNotional = document.getElementById("kpi-notional");
-const kpiYield = document.getElementById("kpi-yield");
+const kpiCurrent = document.getElementById("kpi-current");
+const kpiApy = document.getElementById("kpi-apy");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("de-DE", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0
+    maximumFractionDigits: 2
   }).format(value);
+}
+
+function formatPercent(value) {
+  return `${Number(value || 0).toFixed(2)}%`;
+}
+
+function formatDate(value) {
+  const parsed = parsePositionDate(value);
+  if (!parsed) {
+    return "-";
+  }
+  return new Intl.DateTimeFormat("de-DE", {
+    dateStyle: "medium"
+  }).format(parsed);
 }
 
 function formatArchiveTimestamp(value) {
@@ -69,16 +128,48 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function parsePositionDate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
 function normalizePosition(entry) {
   const safeType = VALID_TYPES.has(entry?.type) ? entry.type : "lending";
   const safeStatus = VALID_STATUSES.has(entry?.status) ? entry.status : "active";
+  const normalizedDate = typeof entry?.date === "string" && parsePositionDate(entry.date) ? entry.date : new Date().toISOString().slice(0, 10);
+  const normalizedInvested = Number.isFinite(Number(entry?.investedAmount))
+    ? Number(entry.investedAmount)
+    : Number.isFinite(Number(entry?.notional))
+      ? Number(entry.notional)
+      : 0;
+  const normalizedCurrent = Number.isFinite(Number(entry?.currentValue))
+    ? Number(entry.currentValue)
+    : Number.isFinite(Number(entry?.notional))
+      ? Number(entry.notional)
+      : 0;
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
     type: safeType,
-    name: typeof entry?.name === "string" && entry.name.trim() ? entry.name.trim() : "Unbenannte Position",
-    notional: Number.isFinite(Number(entry?.notional)) ? Number(entry.notional) : 0,
-    yield: Number.isFinite(Number(entry?.yield)) ? Number(entry.yield) : 0,
+    date: normalizedDate,
+    wallet: typeof entry?.wallet === "string" && entry.wallet.trim() ? entry.wallet.trim() : "Main Wallet",
+    chain: typeof entry?.chain === "string" && entry.chain.trim() ? entry.chain.trim().toUpperCase() : "ETH",
+    projectName: typeof entry?.projectName === "string" && entry.projectName.trim() ? entry.projectName.trim() : TYPE_LABELS[safeType],
+    strategyName:
+      typeof entry?.strategyName === "string" && entry.strategyName.trim()
+        ? entry.strategyName.trim()
+        : typeof entry?.name === "string" && entry.name.trim()
+          ? entry.name.trim()
+          : "Unbenannte Position",
+    investedAmount: normalizedInvested,
+    currentValue: normalizedCurrent,
+    notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
     archivedAt: safeStatus === "archived" && typeof entry?.archivedAt === "string" ? entry.archivedAt : null
   };
@@ -120,15 +211,67 @@ function archivedPositions() {
   return positions.filter((entry) => entry.status === "archived");
 }
 
+function computeRoiUsd(entry) {
+  return Number(entry.currentValue || 0) - Number(entry.investedAmount || 0);
+}
+
+function computeRoiPercent(entry) {
+  const invested = Number(entry.investedAmount || 0);
+  if (invested <= 0) {
+    return 0;
+  }
+  return (computeRoiUsd(entry) / invested) * 100;
+}
+
+function computeApyAnnual(entry) {
+  const invested = Number(entry.investedAmount || 0);
+  const current = Number(entry.currentValue || 0);
+  const startDate = parsePositionDate(entry.date);
+
+  if (invested <= 0 || current <= 0 || !startDate) {
+    return 0;
+  }
+
+  const now = new Date();
+  const elapsedMs = now.getTime() - startDate.getTime();
+  const elapsedDays = Math.max(1, elapsedMs / (1000 * 60 * 60 * 24));
+
+  if (!Number.isFinite(elapsedDays) || elapsedDays <= 0) {
+    return 0;
+  }
+
+  const growthFactor = current / invested;
+  if (growthFactor <= 0) {
+    return 0;
+  }
+
+  const annualized = (Math.pow(growthFactor, 365 / elapsedDays) - 1) * 100;
+  if (!Number.isFinite(annualized)) {
+    return 0;
+  }
+
+  return Math.max(-100, Math.min(annualized, 10000));
+}
+
+function computeMonthlyCashflow(entry) {
+  return (Number(entry.currentValue || 0) * computeApyAnnual(entry)) / 100 / 12;
+}
+
+function roiDisplay(entry) {
+  const roiPercent = computeRoiPercent(entry);
+  const roiUsd = computeRoiUsd(entry);
+  return `${formatPercent(roiPercent)} (${formatCurrency(roiUsd)})`;
+}
+
 function updateKpis() {
   const active = activePositions();
   const totalCount = active.length;
-  const totalNotional = active.reduce((acc, item) => acc + Number(item.notional || 0), 0);
-  const avgYield = totalCount ? active.reduce((acc, item) => acc + Number(item.yield || 0), 0) / totalCount : 0;
+  const totalCurrentValue = active.reduce((acc, item) => acc + Number(item.currentValue || 0), 0);
+  const avgApy = totalCount ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / totalCount : 0;
 
   kpiCount.textContent = String(totalCount);
-  kpiNotional.textContent = formatCurrency(totalNotional);
-  kpiYield.textContent = `${avgYield.toFixed(2)}%`;
+  kpiCurrent.textContent = formatCurrency(totalCurrentValue);
+  kpiApy.textContent = formatPercent(avgApy);
 }
 
 function filteredActivePositions() {
@@ -145,7 +288,7 @@ function renderActiveTable() {
   if (rows.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="5" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
+        <td colspan="12" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
       </tr>
     `;
     return;
@@ -155,10 +298,17 @@ function renderActiveTable() {
     .map((row) => {
       return `
       <tr>
-        <td>${TYPE_LABELS[row.type] || row.type}</td>
-        <td>${escapeHtml(row.name)}</td>
-        <td>${formatCurrency(Number(row.notional || 0))}</td>
-        <td>${Number(row.yield || 0).toFixed(2)}%</td>
+        <td>${formatDate(row.date)}</td>
+        <td>${escapeHtml(row.wallet)}</td>
+        <td>${escapeHtml(row.chain)}</td>
+        <td>${escapeHtml(row.projectName)}</td>
+        <td>${escapeHtml(row.strategyName)}</td>
+        <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
+        <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${roiDisplay(row)}</td>
+        <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
+        <td>${formatPercent(computeApyAnnual(row))}</td>
+        <td>${escapeHtml(row.notes || "-")}</td>
         <td>
           <div class="row-actions">
             <button type="button" class="edit-btn" data-id="${row.id}">Bearbeiten</button>
@@ -178,7 +328,7 @@ function renderArchivedTable() {
   if (rows.length === 0) {
     archivedBody.innerHTML = `
       <tr>
-        <td colspan="6" class="empty">Noch keine archivierten Positionen.</td>
+        <td colspan="13" class="empty">Noch keine archivierten Positionen.</td>
       </tr>
     `;
     return;
@@ -188,10 +338,17 @@ function renderArchivedTable() {
     .map((row) => {
       return `
       <tr>
-        <td>${TYPE_LABELS[row.type] || row.type}</td>
-        <td>${escapeHtml(row.name)}</td>
-        <td>${formatCurrency(Number(row.notional || 0))}</td>
-        <td>${Number(row.yield || 0).toFixed(2)}%</td>
+        <td>${formatDate(row.date)}</td>
+        <td>${escapeHtml(row.wallet)}</td>
+        <td>${escapeHtml(row.chain)}</td>
+        <td>${escapeHtml(row.projectName)}</td>
+        <td>${escapeHtml(row.strategyName)}</td>
+        <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
+        <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${roiDisplay(row)}</td>
+        <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
+        <td>${formatPercent(computeApyAnnual(row))}</td>
+        <td>${escapeHtml(row.notes || "-")}</td>
         <td>${formatArchiveTimestamp(row.archivedAt)}</td>
         <td>
           <div class="row-actions">
@@ -257,6 +414,8 @@ function resetFormMode() {
   editingPositionId = null;
   form.reset();
   typeInput.value = "lending";
+  const today = new Date().toISOString().slice(0, 10);
+  dateInput.value = today;
   setFormMode(false);
 }
 
@@ -278,30 +437,46 @@ form.addEventListener("submit", (event) => {
   const next = {
     id: crypto.randomUUID(),
     type: typeInput.value,
-    name: nameInput.value.trim(),
-    notional: Number(notionalInput.value),
-    yield: Number(yieldInput.value),
+    date: dateInput.value,
+    wallet: walletInput.value.trim(),
+    chain: chainInput.value.trim().toUpperCase(),
+    projectName: projectInput.value.trim(),
+    strategyName: strategyNameInput.value.trim(),
+    investedAmount: Number(investedInput.value),
+    currentValue: Number(currentValueInput.value),
+    notes: notesInput.value.trim(),
     status: "active",
     archivedAt: null
   };
 
-  if (!next.name) {
-    setStatus("Name ist erforderlich.");
+  if (!parsePositionDate(next.date)) {
+    setStatus("Datum ist erforderlich.");
     return;
   }
 
-  if (Number.isNaN(next.notional) || next.notional < 0) {
-    setStatus("Der Nominalwert muss eine nicht-negative Zahl sein.");
+  if (!next.strategyName) {
+    setStatus("Name der Strategie ist erforderlich.");
     return;
   }
 
-  if (Number.isNaN(next.yield)) {
-    setStatus("Die Rendite muss eine gueltige Zahl sein.");
+  if (Number.isNaN(next.investedAmount) || next.investedAmount < 0) {
+    setStatus("Der eingezahlte Betrag muss eine nicht-negative Zahl sein.");
     return;
   }
+
+  if (Number.isNaN(next.currentValue) || next.currentValue < 0) {
+    setStatus("Der aktuelle Wert muss eine nicht-negative Zahl sein.");
+    return;
+  }
+
+  next.wallet = next.wallet || "Main Wallet";
+  next.chain = next.chain || "ETH";
+  next.projectName = next.projectName || TYPE_LABELS[next.type] || "Projekt";
 
   if (editingPositionId) {
-    positions = positions.map((entry) => (entry.id === editingPositionId ? { ...entry, ...next, id: editingPositionId, status: "active", archivedAt: null } : entry));
+    positions = positions.map((entry) =>
+      entry.id === editingPositionId ? { ...entry, ...next, id: editingPositionId, status: "active", archivedAt: null } : entry
+    );
     setStatus("Position aktualisiert.");
   } else {
     positions.unshift(next);
@@ -332,12 +507,17 @@ tableBody.addEventListener("click", (event) => {
 
     editingPositionId = id;
     typeInput.value = position.type;
-    nameInput.value = position.name;
-    notionalInput.value = String(position.notional);
-    yieldInput.value = String(position.yield);
+    dateInput.value = position.date;
+    walletInput.value = position.wallet;
+    chainInput.value = position.chain;
+    projectInput.value = position.projectName;
+    strategyNameInput.value = position.strategyName;
+    investedInput.value = String(position.investedAmount);
+    currentValueInput.value = String(position.currentValue);
+    notesInput.value = position.notes || "";
     setFormMode(true);
     setStatus("Position wird bearbeitet.");
-    nameInput.focus();
+    strategyNameInput.focus();
     return;
   }
 
@@ -402,5 +582,6 @@ archivedBody.addEventListener("click", (event) => {
 
 loadPositions();
 setPage(activePage);
+resetFormMode();
 render();
-console.log("DEF-9 dunkles Einseiten-MVP geladen");
+console.log("DEF-31 required column + editability update loaded");
