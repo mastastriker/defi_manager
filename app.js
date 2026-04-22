@@ -461,7 +461,10 @@ function updateKpis() {
   const active = activePositions();
   const totalCurrentValue = active.reduce((acc, item) => acc + Number(item.currentValue || 0), 0);
   const avgApy = active.length ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / active.length : 0;
-  const totalMonthlyCashflow = active.reduce((acc, item) => acc + computeMonthlyCashflow(item), 0);
+  const totalMonthlyCashflow = active.reduce((acc, item) => {
+    const monthlyCashflow = item.type === "pendle" ? computeFixedMonthlyCashflow(item) : computeMonthlyCashflow(item);
+    return acc + monthlyCashflow;
+  }, 0);
 
   kpiCurrent.textContent = formatCurrency(totalCurrentValue);
   kpiApy.textContent = formatPercent(avgApy);
