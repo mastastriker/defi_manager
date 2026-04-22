@@ -517,7 +517,14 @@ function roiDisplay(entry) {
 function updateKpis() {
   const active = activePositions();
   const totalCurrentValue = active.reduce((acc, item) => acc + Number(item.currentValue || 0), 0);
-  const avgApy = active.length ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / active.length : 0;
+  const totalInvested = active.reduce((acc, item) => acc + Math.max(0, Number(item.investedAmount || 0)), 0);
+  const avgApy =
+    totalInvested > 0
+      ? active.reduce((acc, item) => {
+          const weight = Math.max(0, Number(item.investedAmount || 0));
+          return acc + computeApyAnnual(item) * weight;
+        }, 0) / totalInvested
+      : 0;
   const totalMonthlyCashflow = active.reduce((acc, item) => {
     const monthlyCashflow = item.type === "pendle" ? computeFixedMonthlyCashflow(item) : computeMonthlyCashflow(item);
     return acc + monthlyCashflow;
