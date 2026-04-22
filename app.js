@@ -137,6 +137,7 @@ const walletCount = document.getElementById("wallet-count");
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
 const kpiCashflow = document.getElementById("kpi-cashflow");
+const kpiLendingCost = document.getElementById("kpi-lending-cost");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
 const activeStrategyNameHeader = document.getElementById("active-strategy-name-header");
@@ -542,11 +543,7 @@ function computeBorrowCost(entry) {
   return Math.max(0, debt - payout);
 }
 
-function computeBorrowApy(entry) {
-  const debt = Number(entry.debtUsd || 0);
-  if (debt <= 0) {
-    return 0;
-  }
+function computeElapsedMonths(entry) {
   const startDate = parsePositionDate(entry.date);
   if (!startDate) {
     return 0;
@@ -558,7 +555,27 @@ function computeBorrowApy(entry) {
   if (!Number.isFinite(elapsedMonths) || elapsedMonths <= 0) {
     return 0;
   }
-  const monthlyBorrowCost = computeBorrowCost(entry) / elapsedMonths;
+  return elapsedMonths;
+}
+
+function computeMonthlyBorrowCost(entry) {
+  const elapsedMonths = computeElapsedMonths(entry);
+  if (elapsedMonths <= 0) {
+    return 0;
+  }
+  return computeBorrowCost(entry) / elapsedMonths;
+}
+
+function computeBorrowApy(entry) {
+  const debt = Number(entry.debtUsd || 0);
+  if (debt <= 0) {
+    return 0;
+  }
+  const elapsedMonths = computeElapsedMonths(entry);
+  if (!Number.isFinite(elapsedMonths) || elapsedMonths <= 0) {
+    return 0;
+  }
+  const monthlyBorrowCost = computeMonthlyBorrowCost(entry);
   const monthlyRate = monthlyBorrowCost / debt;
   if (!Number.isFinite(monthlyRate) || monthlyRate <= -1) {
     return 0;
@@ -614,11 +631,20 @@ function updateKpis() {
     const monthlyCashflow = item.type === "pendle" ? computeFixedMonthlyCashflow(item) : computeMonthlyCashflow(item);
     return acc + monthlyCashflow;
   }, 0);
+  const totalLendingCostMonthly = active.reduce((acc, item) => {
+    if (item.type !== "lending") {
+      return acc;
+    }
+    return acc + computeMonthlyBorrowCost(item);
+  }, 0);
   const avgApy = computeCompoundedAnnualApy(totalMonthlyCashflow, totalCurrentValue);
 
   kpiCurrent.textContent = formatCurrency(totalCurrentValue);
   kpiApy.textContent = formatPercent(avgApy);
   kpiCashflow.textContent = formatCurrency(totalMonthlyCashflow);
+  if (kpiLendingCost) {
+    kpiLendingCost.textContent = formatCurrency(totalLendingCostMonthly);
+  }
 }
 
 function updatePositionCountLabel() {
