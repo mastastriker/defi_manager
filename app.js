@@ -474,14 +474,13 @@ function computeObservedMonthlyCashflow(entry) {
   return roiUsd / elapsedMonths;
 }
 
-function computeApyAnnual(entry) {
-  const invested = Number(entry.investedAmount || 0);
-  if (invested <= 0) {
+function computeCompoundedAnnualApy(monthlyCashflow, baseValue) {
+  const numericBase = Number(baseValue || 0);
+  if (numericBase <= 0) {
     return 0;
   }
 
-  const monthlyCashflow = computeObservedMonthlyCashflow(entry);
-  const monthlyRate = monthlyCashflow / invested;
+  const monthlyRate = Number(monthlyCashflow || 0) / numericBase;
   if (!Number.isFinite(monthlyRate) || monthlyRate <= -1) {
     return 0;
   }
@@ -492,6 +491,11 @@ function computeApyAnnual(entry) {
   }
 
   return Math.max(-100, Math.min(annualized, 10000));
+}
+
+function computeApyAnnual(entry) {
+  const monthlyCashflow = computeObservedMonthlyCashflow(entry);
+  return computeCompoundedAnnualApy(monthlyCashflow, Number(entry.currentValue || 0));
 }
 
 function computeMonthlyCashflow(entry) {
@@ -529,18 +533,11 @@ function roiDisplay(entry) {
 function updateKpis() {
   const active = activePositions();
   const totalCurrentValue = active.reduce((acc, item) => acc + Number(item.currentValue || 0), 0);
-  const totalInvested = active.reduce((acc, item) => acc + Math.max(0, Number(item.investedAmount || 0)), 0);
-  const avgApy =
-    totalInvested > 0
-      ? active.reduce((acc, item) => {
-          const weight = Math.max(0, Number(item.investedAmount || 0));
-          return acc + computeApyAnnual(item) * weight;
-        }, 0) / totalInvested
-      : 0;
   const totalMonthlyCashflow = active.reduce((acc, item) => {
     const monthlyCashflow = item.type === "pendle" ? computeFixedMonthlyCashflow(item) : computeMonthlyCashflow(item);
     return acc + monthlyCashflow;
   }, 0);
+  const avgApy = computeCompoundedAnnualApy(totalMonthlyCashflow, totalCurrentValue);
 
   kpiCurrent.textContent = formatCurrency(totalCurrentValue);
   kpiApy.textContent = formatPercent(avgApy);
