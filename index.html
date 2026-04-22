@@ -72,6 +72,10 @@
               Name der Strategie
               <input id="position-strategy-name" type="text" maxlength="80" placeholder="PT-ETH Dec 2026" required />
             </label>
+            <label id="position-maturity-field">
+              Maturity (nur PT)
+              <input id="position-maturity" type="date" />
+            </label>
             <label>
               Eingezahlter Betrag (USD)
               <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
@@ -95,7 +99,7 @@
         </section>
 
         <section class="panel" aria-label="Aktive Positionstabelle">
-          <h2>Aktive Positionen <span id="active-positions-total" class="heading-count">(0)</span></h2>
+          <h2><span id="active-table-title">Klassische Yield Strategien Tabelle</span> <span id="active-positions-total" class="heading-count">(0)</span></h2>
           <div class="tabs" role="tablist" aria-label="Positions-Typ-Tabs">
             <button type="button" class="tab active" data-tab="strategy" role="tab" aria-selected="true">Klassische Yield Strategien</button>
             <button type="button" class="tab" data-tab="pendle" role="tab" aria-selected="false">PT Strategien</button>
@@ -169,6 +173,12 @@
                   <th data-sort-table="active" data-sort-key="apyAnnual" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="apyAnnual">
                       APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="maturityDate" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="maturityDate">
+                      Maturity
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
@@ -258,6 +268,12 @@
                   <th data-sort-table="archive" data-sort-key="apyAnnual" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="apyAnnual">
                       APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="maturityDate" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="maturityDate">
+                      Maturity
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>

@@ -12,6 +12,11 @@ const TYPE_LABELS = {
   pendle: "PT Strategien",
   strategy: "Klassische Yield Strategien"
 };
+const TABLE_TITLES = {
+  lending: "Lending/Borrow Positionen Tabelle",
+  pendle: "PT Strategien Tabelle",
+  strategy: "Klassische Yield Strategien Tabelle"
+};
 
 const VALID_TYPES = new Set(["lending", "pendle", "strategy"]);
 const VALID_STATUSES = new Set(["active", "archived"]);
@@ -32,6 +37,7 @@ const initialPositions = [
     interestAmount: 18000,
     currentValue: 928000,
     calculationMode: "interest",
+    maturityDate: null,
     notes: "Blue-chip lending baseline",
     status: "active",
     archivedAt: null
@@ -48,6 +54,7 @@ const initialPositions = [
     interestAmount: 24500,
     currentValue: 334500,
     calculationMode: "interest",
+    maturityDate: "2026-12-31",
     notes: "Seasonal convexity thesis",
     status: "active",
     archivedAt: null
@@ -64,6 +71,7 @@ const initialPositions = [
     interestAmount: 9500,
     currentValue: 229500,
     calculationMode: "interest",
+    maturityDate: null,
     notes: "Low-vol carry",
     status: "active",
     archivedAt: null
@@ -86,6 +94,8 @@ const walletInput = document.getElementById("position-wallet");
 const chainInput = document.getElementById("position-chain");
 const projectInput = document.getElementById("position-project");
 const strategyNameInput = document.getElementById("position-strategy-name");
+const maturityField = document.getElementById("position-maturity-field");
+const maturityInput = document.getElementById("position-maturity");
 const investedInput = document.getElementById("position-invested");
 const interestInput = document.getElementById("position-interest");
 const currentInput = document.getElementById("position-current");
@@ -110,6 +120,7 @@ const walletCount = document.getElementById("wallet-count");
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
 const kpiCashflow = document.getElementById("kpi-cashflow");
+const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
 
 function formatCurrency(value) {
@@ -195,6 +206,9 @@ function normalizePosition(entry) {
     ? normalizedCurrent
     : normalizedInvested + normalizedInterest;
 
+  const rawMaturityDate = typeof entry?.maturityDate === "string" ? entry.maturityDate : entry?.maturity;
+  const normalizedMaturityDate = typeof rawMaturityDate === "string" && parsePositionDate(rawMaturityDate) ? rawMaturityDate : null;
+
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
     type: safeType,
@@ -218,6 +232,7 @@ function normalizePosition(entry) {
     interestAmount: computedInterest,
     currentValue: computedCurrent,
     calculationMode: normalizedCalculationMode,
+    maturityDate: normalizedMaturityDate,
     notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
     archivedAt: safeStatus === "archived" && typeof entry?.archivedAt === "string" ? entry.archivedAt : null
@@ -406,10 +421,23 @@ function updateKpis() {
 }
 
 function updatePositionCountLabel() {
+  if (activeTableTitle) {
+    activeTableTitle.textContent = TABLE_TITLES[activeTab] || "Aktive Positionen Tabelle";
+  }
   if (!activePositionsTotal) {
     return;
   }
-  activePositionsTotal.textContent = `(${activePositions().length})`;
+  activePositionsTotal.textContent = `(${filteredActivePositions().length})`;
+}
+
+function syncMaturityField(positionType) {
+  const isPendle = positionType === "pendle";
+  if (maturityField) {
+    maturityField.hidden = !isPendle;
+  }
+  if (!isPendle && maturityInput) {
+    maturityInput.value = "";
+  }
 }
 
 function renderWalletSelect() {
@@ -469,6 +497,10 @@ function getSortValue(entry, key) {
     case "strategyName":
     case "notes":
       return String(entry[key] || "");
+    case "maturityDate": {
+      const maturityDate = parsePositionDate(entry.maturityDate);
+      return maturityDate ? maturityDate.getTime() : 0;
+    }
     case "investedAmount":
     case "currentValue":
     case "interestAmount":
@@ -539,11 +571,12 @@ function updateSortUi() {
 
 function renderActiveTable() {
   const rows = sortRows(filteredActivePositions(), "active");
+  const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="13" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
+        <td colspan="14" class="empty">In ${activeTabLabel} sind noch keine aktiven Positionen vorhanden.</td>
       </tr>
     `;
     return;
@@ -564,6 +597,7 @@ function renderActiveTable() {
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
+        <td>${formatDate(row.maturityDate)}</td>
         <td>${escapeHtml(row.notes || "-")}</td>
         <td>
           <div class="row-actions">
@@ -584,7 +618,7 @@ function renderArchivedTable() {
   if (rows.length === 0) {
     archivedBody.innerHTML = `
       <tr>
-        <td colspan="14" class="empty">Noch keine archivierten Positionen.</td>
+        <td colspan="15" class="empty">Noch keine archivierten Positionen.</td>
       </tr>
     `;
     return;
@@ -605,6 +639,7 @@ function renderArchivedTable() {
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
+        <td>${formatDate(row.maturityDate)}</td>
         <td>${escapeHtml(row.notes || "-")}</td>
         <td>${formatArchiveTimestamp(row.archivedAt)}</td>
         <td>
@@ -635,6 +670,9 @@ function setActiveTab(nextTab) {
     tab.classList.toggle("active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
   });
+  if (!editingPositionId) {
+    syncMaturityField(nextTab);
+  }
   renderActiveTable();
 }
 
@@ -677,6 +715,7 @@ function resetFormMode() {
   chainInput.value = DEFAULT_CHAIN;
   const today = new Date().toISOString().slice(0, 10);
   dateInput.value = today;
+  syncMaturityField(activeTab);
   syncCalculationInputs();
   setFormMode(false);
 }
@@ -781,6 +820,7 @@ form.addEventListener("submit", (event) => {
     interestAmount: 0,
     currentValue: 0,
     calculationMode: "interest",
+    maturityDate: null,
     notes: notesInput.value.trim(),
     status: "active",
     archivedAt: null
@@ -791,6 +831,14 @@ form.addEventListener("submit", (event) => {
   if (!parsePositionDate(next.date)) {
     setStatus("Datum ist erforderlich.");
     return;
+  }
+
+  if (maturityInput?.value) {
+    if (!parsePositionDate(maturityInput.value)) {
+      setStatus("Maturity muss ein gültiges Datum sein.");
+      return;
+    }
+    next.maturityDate = maturityInput.value;
   }
 
   if (!next.strategyName) {
@@ -898,6 +946,7 @@ tableBody.addEventListener("click", (event) => {
     chainInput.value = position.chain;
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
+    maturityInput.value = position.maturityDate || "";
     investedInput.value = String(position.investedAmount);
     if (position.calculationMode === "current") {
       currentInput.value = String(Number(position.currentValue || 0));
@@ -907,6 +956,7 @@ tableBody.addEventListener("click", (event) => {
       currentInput.value = "";
     }
     notesInput.value = position.notes || "";
+    syncMaturityField(position.type);
     syncCalculationInputs();
     setFormMode(true);
     setStatus("Position wird bearbeitet.");
