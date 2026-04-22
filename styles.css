@@ -22,8 +22,10 @@ body {
 }
 
 .shell {
-  width: min(1050px, 100% - 2rem);
+  width: 100%;
+  max-width: 1050px;
   margin: 0 auto;
+  padding: 0 1rem;
 }
 
 .bg-glow {
