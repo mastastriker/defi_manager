@@ -114,10 +114,13 @@ const debtField = document.getElementById("position-debt-field");
 const debtInput = document.getElementById("position-debt");
 const borrowPayoutField = document.getElementById("position-borrow-payout-field");
 const borrowPayoutInput = document.getElementById("position-borrow-payout");
+const investedField = document.getElementById("position-invested-field");
+const investedLabel = document.getElementById("position-invested-label");
 const investedInput = document.getElementById("position-invested");
 const interestField = document.getElementById("position-interest-field");
 const interestInput = document.getElementById("position-interest");
 const currentField = document.getElementById("position-current-field");
+const currentLabel = document.getElementById("position-current-label");
 const currentInput = document.getElementById("position-current");
 const notesField = document.getElementById("position-notes-field");
 const notesInput = document.getElementById("position-notes");
@@ -181,6 +184,11 @@ function formatQuantity(value) {
   return new Intl.NumberFormat("de-DE", {
     maximumFractionDigits: 6
   }).format(Number(value));
+}
+
+function formatAssetAmount(value, asset) {
+  const unit = typeof asset === "string" && asset.trim() ? asset.trim() : "USD";
+  return `${formatQuantity(value)} ${unit}`;
 }
 
 function formatDate(value) {
@@ -257,6 +265,22 @@ function parsePositionDate(value) {
   }
 
   return parsed;
+}
+
+function currentCollateralUnit() {
+  const raw = collateralInput?.value || "";
+  const cleaned = raw.trim();
+  return cleaned || "USD";
+}
+
+function updateLendingAmountLabels() {
+  const unit = currentCollateralUnit();
+  if (investedLabel) {
+    investedLabel.textContent = `Eingezahlter Betrag (${unit})`;
+  }
+  if (currentLabel) {
+    currentLabel.textContent = `Aktueller Wert (${unit})`;
+  }
 }
 
 function normalizeDateTimeValue(value) {
@@ -745,9 +769,12 @@ function syncTypeSpecificFields(positionType) {
   if (notesField) {
     notesField.hidden = !isStrategy;
   }
+  if (investedField) {
+    investedField.hidden = false;
+  }
   if (!isLending) {
     if (collateralInput) {
-      collateralInput.value = "";
+      collateralInput.value = "ETH";
     }
     if (debtInput) {
       debtInput.value = "";
@@ -756,6 +783,9 @@ function syncTypeSpecificFields(positionType) {
       borrowPayoutInput.value = "";
     }
   } else {
+    if (collateralInput && !collateralInput.value) {
+      collateralInput.value = "ETH";
+    }
     if (interestInput) {
       interestInput.value = "";
     }
@@ -769,6 +799,7 @@ function syncTypeSpecificFields(positionType) {
   if (!isStrategy && notesInput) {
     notesInput.value = "";
   }
+  updateLendingAmountLabels();
 }
 
 function renderWalletSelect() {
@@ -944,8 +975,8 @@ function renderActiveTable() {
         <td>${escapeHtml(row.chain)}</td>
         <td>${escapeHtml(row.projectName)}</td>
         ${showLending ? `<td>${escapeHtml(row.collateral || "-")}</td>` : `<td>${escapeHtml(row.strategyName)}</td>`}
-        <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
-        <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${showLending ? formatAssetAmount(Number(row.investedAmount || 0), row.collateral) : formatCurrency(Number(row.investedAmount || 0))}</td>
+        <td>${showLending ? formatAssetAmount(Number(row.currentValue || 0), row.collateral) : formatCurrency(Number(row.currentValue || 0))}</td>
         ${showLending ? "" : `<td>${formatCurrency(Number(row.interestAmount || 0))}</td>`}
         ${showLending ? "" : `<td>${roiDisplay(row)}</td>`}
         ${showLending ? "" : `<td>${formatCurrency(computeMonthlyCashflow(row))}</td>`}
@@ -1167,6 +1198,10 @@ currentInput.addEventListener("input", () => {
     interestInput.value = "";
   }
   syncCalculationInputs();
+});
+
+collateralInput?.addEventListener("change", () => {
+  updateLendingAmountLabels();
 });
 
 sortableHeaders.forEach((header) => {

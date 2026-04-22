@@ -86,7 +86,13 @@
             </label>
             <label id="position-collateral-field">
               Collateral (nur Lending/Borrow)
-              <input id="position-collateral" type="text" maxlength="64" placeholder="ETH, BTC, stETH" />
+              <select id="position-collateral">
+                <option value="ETH">ETH</option>
+                <option value="BTC">BTC</option>
+                <option value="stETH">stETH</option>
+                <option value="USDC">USDC</option>
+                <option value="DAI">DAI</option>
+              </select>
             </label>
             <label id="position-debt-field">
               Schulden in $ (nur Lending/Borrow)
@@ -96,8 +102,8 @@
               Borrow Ausgezahlt (nur Lending/Borrow)
               <input id="position-borrow-payout" type="number" min="0" step="0.01" placeholder="24800" />
             </label>
-            <label>
-              Eingezahlter Betrag (USD)
+            <label id="position-invested-field">
+              <span id="position-invested-label">Eingezahlter Betrag (USD)</span>
               <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
             </label>
             <label id="position-interest-field">
@@ -105,7 +111,7 @@
               <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
             </label>
             <label id="position-current-field">
-              Aktueller Wert (USD)
+              <span id="position-current-label">Aktueller Wert (USD)</span>
               <input id="position-current" type="number" min="0" step="0.01" placeholder="102500" />
             </label>
             <label id="position-notes-field" class="span-full">
