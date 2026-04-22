@@ -88,12 +88,17 @@
               Zinsen (USD)
               <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
             </label>
+            <label>
+              Aktueller Wert (USD)
+              <input id="position-current" type="number" min="0" step="0.01" placeholder="102500" />
+            </label>
             <label class="span-full">
               Notizen
               <input id="position-notes" type="text" maxlength="240" placeholder="Freitext-Notiz zur Position" />
             </label>
             <button type="submit" class="btn-primary">Position hinzufügen</button>
           </form>
+          <p class="meta-note">Trage entweder Zinsen oder den aktuellen Wert ein. Das jeweils andere Feld wird automatisch berechnet.</p>
           <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
         </section>
 

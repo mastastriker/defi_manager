@@ -31,6 +31,7 @@ const initialPositions = [
     investedAmount: 910000,
     interestAmount: 18000,
     currentValue: 928000,
+    calculationMode: "interest",
     notes: "Blue-chip lending baseline",
     status: "active",
     archivedAt: null
@@ -46,6 +47,7 @@ const initialPositions = [
     investedAmount: 310000,
     interestAmount: 24500,
     currentValue: 334500,
+    calculationMode: "interest",
     notes: "Seasonal convexity thesis",
     status: "active",
     archivedAt: null
@@ -61,6 +63,7 @@ const initialPositions = [
     investedAmount: 220000,
     interestAmount: 9500,
     currentValue: 229500,
+    calculationMode: "interest",
     notes: "Low-vol carry",
     status: "active",
     archivedAt: null
@@ -86,6 +89,7 @@ const projectInput = document.getElementById("position-project");
 const strategyNameInput = document.getElementById("position-strategy-name");
 const investedInput = document.getElementById("position-invested");
 const interestInput = document.getElementById("position-interest");
+const currentInput = document.getElementById("position-current");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
 const tableBody = document.getElementById("positions-body");
@@ -179,12 +183,18 @@ function normalizePosition(entry) {
     : Number.isFinite(Number(entry?.notional))
       ? Number(entry.notional)
       : normalizedInvested;
+  const normalizedCalculationMode = entry?.calculationMode === "current" ? "current" : "interest";
   const normalizedInterest = Number.isFinite(Number(entry?.interestAmount))
     ? Number(entry.interestAmount)
     : Number.isFinite(Number(entry?.interest))
       ? Number(entry.interest)
       : Math.max(0, normalizedCurrent - normalizedInvested);
-  const computedCurrent = normalizedInvested + normalizedInterest;
+  const computedInterest = normalizedCalculationMode === "current"
+    ? Math.max(0, normalizedCurrent - normalizedInvested)
+    : normalizedInterest;
+  const computedCurrent = normalizedCalculationMode === "current"
+    ? normalizedCurrent
+    : normalizedInvested + normalizedInterest;
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -206,8 +216,9 @@ function normalizePosition(entry) {
           ? entry.name.trim()
           : "Unbenannte Position",
     investedAmount: normalizedInvested,
-    interestAmount: normalizedInterest,
+    interestAmount: computedInterest,
     currentValue: computedCurrent,
+    calculationMode: normalizedCalculationMode,
     notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
     archivedAt: safeStatus === "archived" && typeof entry?.archivedAt === "string" ? entry.archivedAt : null
@@ -672,7 +683,36 @@ function resetFormMode() {
   chainInput.value = DEFAULT_CHAIN;
   const today = new Date().toISOString().slice(0, 10);
   dateInput.value = today;
+  syncCalculationInputs();
   setFormMode(false);
+}
+
+function parseOptionalNumber(value) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : Number.NaN;
+}
+
+function syncCalculationInputs() {
+  const hasInterestValue = interestInput.value.trim() !== "";
+  const hasCurrentValue = currentInput.value.trim() !== "";
+
+  if (hasInterestValue && !hasCurrentValue) {
+    currentInput.disabled = true;
+    interestInput.disabled = false;
+    return;
+  }
+
+  if (hasCurrentValue && !hasInterestValue) {
+    interestInput.disabled = true;
+    currentInput.disabled = false;
+    return;
+  }
+
+  interestInput.disabled = false;
+  currentInput.disabled = false;
 }
 
 tabs.forEach((tab) => {
@@ -685,6 +725,20 @@ pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     setPage(tab.dataset.pageTarget);
   });
+});
+
+interestInput.addEventListener("input", () => {
+  if (interestInput.value.trim() !== "") {
+    currentInput.value = "";
+  }
+  syncCalculationInputs();
+});
+
+currentInput.addEventListener("input", () => {
+  if (currentInput.value.trim() !== "") {
+    interestInput.value = "";
+  }
+  syncCalculationInputs();
 });
 
 sortableHeaders.forEach((header) => {
@@ -729,13 +783,15 @@ form.addEventListener("submit", (event) => {
     projectName: projectInput.value.trim(),
     strategyName: strategyNameInput.value.trim(),
     investedAmount: Number(investedInput.value),
-    interestAmount: Number(interestInput.value || 0),
+    interestAmount: 0,
+    currentValue: 0,
+    calculationMode: "interest",
     notes: notesInput.value.trim(),
     status: "active",
     archivedAt: null
   };
-
-  next.currentValue = next.investedAmount + next.interestAmount;
+  const providedInterest = parseOptionalNumber(interestInput.value);
+  const providedCurrent = parseOptionalNumber(currentInput.value);
 
   if (!parsePositionDate(next.date)) {
     setStatus("Datum ist erforderlich.");
@@ -752,8 +808,48 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  if (Number.isNaN(next.interestAmount) || next.interestAmount < 0) {
+  if (providedInterest !== null && Number.isNaN(providedInterest)) {
+    setStatus("Zinsen müssen eine gültige Zahl sein.");
+    return;
+  }
+
+  if (providedCurrent !== null && Number.isNaN(providedCurrent)) {
+    setStatus("Aktueller Wert muss eine gültige Zahl sein.");
+    return;
+  }
+
+  if (providedInterest !== null && providedCurrent !== null) {
+    setStatus("Bitte entweder Zinsen oder aktuellen Wert eintragen, nicht beides.");
+    return;
+  }
+
+  if (providedInterest === null && providedCurrent === null) {
+    setStatus("Bitte entweder Zinsen oder aktuellen Wert eintragen.");
+    return;
+  }
+
+  if (providedInterest !== null && providedInterest < 0) {
     setStatus("Zinsen müssen eine nicht-negative Zahl sein.");
+    return;
+  }
+
+  if (providedCurrent !== null && providedCurrent < 0) {
+    setStatus("Aktueller Wert muss eine nicht-negative Zahl sein.");
+    return;
+  }
+
+  if (providedInterest !== null) {
+    next.interestAmount = providedInterest;
+    next.currentValue = next.investedAmount + next.interestAmount;
+    next.calculationMode = "interest";
+  } else {
+    next.currentValue = providedCurrent;
+    next.interestAmount = next.currentValue - next.investedAmount;
+    next.calculationMode = "current";
+  }
+
+  if (next.interestAmount < 0) {
+    setStatus("Der aktuelle Wert darf nicht kleiner als der eingezahlte Betrag sein.");
     return;
   }
 
@@ -809,8 +905,15 @@ tableBody.addEventListener("click", (event) => {
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
     investedInput.value = String(position.investedAmount);
-    interestInput.value = String(Number(position.interestAmount || 0));
+    if (position.calculationMode === "current") {
+      currentInput.value = String(Number(position.currentValue || 0));
+      interestInput.value = "";
+    } else {
+      interestInput.value = String(Number(position.interestAmount || 0));
+      currentInput.value = "";
+    }
     notesInput.value = position.notes || "";
+    syncCalculationInputs();
     setFormMode(true);
     setStatus("Position wird bearbeitet.");
     strategyNameInput.focus();

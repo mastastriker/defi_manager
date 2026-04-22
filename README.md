@@ -29,8 +29,8 @@ Open: `http://localhost:4173`
 
 1. Use the `Manual Position Entry` form to add a position.
 2. Wallets are selected from the managed wallet dropdown (`Cash1` and `Cash2` defaults).
-3. Enter `Zinsen (USD)` when available.
-4. `Aktueller Wert` is automatically calculated as `Eingezahlt + Zinsen`.
+3. Enter exactly one value: either `Zinsen (USD)` or `Aktueller Wert (USD)`.
+4. The other value is calculated automatically (`Aktueller Wert = Eingezahlt + Zinsen` / `Zinsen = Aktueller Wert - Eingezahlt`).
 5. Position appears in the table and KPI totals update immediately.
 6. Reload the page.
 7. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
