@@ -101,6 +101,7 @@ const walletForm = document.getElementById("wallet-form");
 const walletNameInput = document.getElementById("wallet-name");
 const walletList = document.getElementById("wallet-list");
 const walletStatus = document.getElementById("wallet-status");
+const walletCount = document.getElementById("wallet-count");
 
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
@@ -413,16 +414,27 @@ function renderWalletList() {
   if (!walletList) {
     return;
   }
+  if (walletCount) {
+    walletCount.textContent = String(wallets.length);
+  }
   walletList.innerHTML = wallets
-    .map(
-      (wallet) => `
-      <li>
-        <span>${escapeHtml(wallet)}</span>
-        <button type="button" class="wallet-action-btn edit-wallet-btn" data-wallet="${escapeHtml(wallet)}">Bearbeiten</button>
-        <button type="button" class="wallet-action-btn delete-wallet-btn" data-wallet="${escapeHtml(wallet)}">Löschen</button>
+    .map((wallet) => {
+      const usageCount = positions.filter((entry) => entry.wallet === wallet).length;
+      const usageLabel = usageCount > 0 ? `${usageCount} Position${usageCount === 1 ? "" : "en"}` : "Nicht verwendet";
+      const usageClass = usageCount > 0 ? "is-used" : "is-free";
+      return `
+      <li class="wallet-item">
+        <div class="wallet-main">
+          <span class="wallet-name">${escapeHtml(wallet)}</span>
+          <span class="wallet-usage-tag ${usageClass}">${usageLabel}</span>
+        </div>
+        <div class="wallet-actions">
+          <button type="button" class="wallet-action-btn edit-wallet-btn" data-wallet="${escapeHtml(wallet)}">Bearbeiten</button>
+          <button type="button" class="wallet-action-btn delete-wallet-btn" data-wallet="${escapeHtml(wallet)}">Löschen</button>
+        </div>
       </li>
-    `
-    )
+    `;
+    })
     .join("");
 }
 
