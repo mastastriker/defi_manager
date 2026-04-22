@@ -80,8 +80,8 @@
               <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
             </label>
             <label>
-              Aktueller Wert (USD)
-              <input id="position-current-value" type="number" min="0" step="0.01" placeholder="102500" required />
+              Zinsen (USD)
+              <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
             </label>
             <label class="span-full">
               Notizen
@@ -144,6 +144,12 @@
                   <th data-sort-table="active" data-sort-key="currentValue" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="currentValue">
                       Aktueller Wert
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="interestAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="interestAmount">
+                      Zinsen
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
@@ -227,6 +233,12 @@
                   <th data-sort-table="archive" data-sort-key="currentValue" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="currentValue">
                       Aktueller Wert
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="interestAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="interestAmount">
+                      Zinsen
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>

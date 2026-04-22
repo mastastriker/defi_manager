@@ -24,6 +24,7 @@ const initialPositions = [
     projectName: "Aave",
     strategyName: "USDC Lending Core",
     investedAmount: 910000,
+    interestAmount: 18000,
     currentValue: 928000,
     notes: "Blue-chip lending baseline",
     status: "active",
@@ -38,6 +39,7 @@ const initialPositions = [
     projectName: "Pendle",
     strategyName: "PT-ETH Dec 2026",
     investedAmount: 310000,
+    interestAmount: 24500,
     currentValue: 334500,
     notes: "Seasonal convexity thesis",
     status: "active",
@@ -52,6 +54,7 @@ const initialPositions = [
     projectName: "Morpho",
     strategyName: "Stablecoin Basis Loop",
     investedAmount: 220000,
+    interestAmount: 9500,
     currentValue: 229500,
     notes: "Low-vol carry",
     status: "active",
@@ -76,7 +79,7 @@ const chainInput = document.getElementById("position-chain");
 const projectInput = document.getElementById("position-project");
 const strategyNameInput = document.getElementById("position-strategy-name");
 const investedInput = document.getElementById("position-invested");
-const currentValueInput = document.getElementById("position-current-value");
+const interestInput = document.getElementById("position-interest");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
 const tableBody = document.getElementById("positions-body");
@@ -162,7 +165,13 @@ function normalizePosition(entry) {
     ? Number(entry.currentValue)
     : Number.isFinite(Number(entry?.notional))
       ? Number(entry.notional)
-      : 0;
+      : normalizedInvested;
+  const normalizedInterest = Number.isFinite(Number(entry?.interestAmount))
+    ? Number(entry.interestAmount)
+    : Number.isFinite(Number(entry?.interest))
+      ? Number(entry.interest)
+      : Math.max(0, normalizedCurrent - normalizedInvested);
+  const computedCurrent = normalizedInvested + normalizedInterest;
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -178,7 +187,8 @@ function normalizePosition(entry) {
           ? entry.name.trim()
           : "Unbenannte Position",
     investedAmount: normalizedInvested,
-    currentValue: normalizedCurrent,
+    interestAmount: normalizedInterest,
+    currentValue: computedCurrent,
     notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
     archivedAt: safeStatus === "archived" && typeof entry?.archivedAt === "string" ? entry.archivedAt : null
@@ -352,6 +362,7 @@ function getSortValue(entry, key) {
       return String(entry[key] || "");
     case "investedAmount":
     case "currentValue":
+    case "interestAmount":
       return Number(entry[key] || 0);
     case "roiPercent":
       return computeRoiPercent(entry);
@@ -423,7 +434,7 @@ function renderActiveTable() {
   if (rows.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="12" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
+        <td colspan="13" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
       </tr>
     `;
     return;
@@ -440,6 +451,7 @@ function renderActiveTable() {
         <td>${escapeHtml(row.strategyName)}</td>
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
@@ -463,7 +475,7 @@ function renderArchivedTable() {
   if (rows.length === 0) {
     archivedBody.innerHTML = `
       <tr>
-        <td colspan="13" class="empty">Noch keine archivierten Positionen.</td>
+        <td colspan="14" class="empty">Noch keine archivierten Positionen.</td>
       </tr>
     `;
     return;
@@ -480,6 +492,7 @@ function renderArchivedTable() {
         <td>${escapeHtml(row.strategyName)}</td>
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
@@ -608,11 +621,13 @@ form.addEventListener("submit", (event) => {
     projectName: projectInput.value.trim(),
     strategyName: strategyNameInput.value.trim(),
     investedAmount: Number(investedInput.value),
-    currentValue: Number(currentValueInput.value),
+    interestAmount: Number(interestInput.value || 0),
     notes: notesInput.value.trim(),
     status: "active",
     archivedAt: null
   };
+
+  next.currentValue = next.investedAmount + next.interestAmount;
 
   if (!parsePositionDate(next.date)) {
     setStatus("Datum ist erforderlich.");
@@ -629,8 +644,8 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  if (Number.isNaN(next.currentValue) || next.currentValue < 0) {
-    setStatus("Der aktuelle Wert muss eine nicht-negative Zahl sein.");
+  if (Number.isNaN(next.interestAmount) || next.interestAmount < 0) {
+    setStatus("Zinsen müssen eine nicht-negative Zahl sein.");
     return;
   }
 
@@ -678,7 +693,7 @@ tableBody.addEventListener("click", (event) => {
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
     investedInput.value = String(position.investedAmount);
-    currentValueInput.value = String(position.currentValue);
+    interestInput.value = String(Number(position.interestAmount || 0));
     notesInput.value = position.notes || "";
     setFormMode(true);
     setStatus("Position wird bearbeitet.");

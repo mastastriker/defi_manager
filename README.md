@@ -27,10 +27,12 @@ Open: `http://localhost:4173`
 ## Manual-entry and persistence flow
 
 1. Use the `Manual Position Entry` form to add a position.
-2. Position appears in the table and KPI totals update immediately.
-3. Reload the page.
-4. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
-5. Delete a row to remove it and persist the removal.
+2. Enter `Zinsen (USD)` when available.
+3. `Aktueller Wert` is automatically calculated as `Eingezahlt + Zinsen`.
+4. Position appears in the table and KPI totals update immediately.
+5. Reload the page.
+6. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
+7. Delete a row to remove it and persist the removal.
 
 ## Archive flow (DEF-30)
 
