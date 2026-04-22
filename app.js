@@ -452,7 +452,7 @@ function computeRoiPercent(entry) {
   return (computeRoiUsd(entry) / invested) * 100;
 }
 
-function computeApyAnnual(entry) {
+function computeObservedMonthlyCashflow(entry) {
   const invested = Number(entry.investedAmount || 0);
   const current = Number(entry.currentValue || 0);
   const startDate = parsePositionDate(entry.date);
@@ -464,17 +464,29 @@ function computeApyAnnual(entry) {
   const now = new Date();
   const elapsedMs = now.getTime() - startDate.getTime();
   const elapsedHours = elapsedMs / MS_PER_HOUR;
+  const elapsedMonths = elapsedHours / HOURS_PER_MONTH;
 
-  if (!Number.isFinite(elapsedHours) || elapsedHours <= 0) {
+  if (!Number.isFinite(elapsedMonths) || elapsedMonths <= 0) {
     return 0;
   }
 
-  const growthFactor = current / invested;
-  if (growthFactor <= 0) {
+  const roiUsd = current - invested;
+  return roiUsd / elapsedMonths;
+}
+
+function computeApyAnnual(entry) {
+  const invested = Number(entry.investedAmount || 0);
+  if (invested <= 0) {
     return 0;
   }
 
-  const annualized = (Math.pow(growthFactor, HOURS_PER_YEAR / elapsedHours) - 1) * 100;
+  const monthlyCashflow = computeObservedMonthlyCashflow(entry);
+  const monthlyRate = monthlyCashflow / invested;
+  if (!Number.isFinite(monthlyRate) || monthlyRate <= -1) {
+    return 0;
+  }
+
+  const annualized = (Math.pow(1 + monthlyRate, 12) - 1) * 100;
   if (!Number.isFinite(annualized)) {
     return 0;
   }
@@ -483,7 +495,7 @@ function computeApyAnnual(entry) {
 }
 
 function computeMonthlyCashflow(entry) {
-  return (Number(entry.currentValue || 0) * computeApyAnnual(entry)) / 100 / 12;
+  return computeObservedMonthlyCashflow(entry);
 }
 
 function computeRoiAtMaturity(entry) {
