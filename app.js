@@ -102,6 +102,7 @@ const dateInput = document.getElementById("position-date");
 const walletInput = document.getElementById("position-wallet");
 const chainInput = document.getElementById("position-chain");
 const projectInput = document.getElementById("position-project");
+const strategyNameField = document.getElementById("position-strategy-name-field");
 const strategyNameInput = document.getElementById("position-strategy-name");
 const maturityField = document.getElementById("position-maturity-field");
 const maturityInput = document.getElementById("position-maturity");
@@ -114,8 +115,11 @@ const debtInput = document.getElementById("position-debt");
 const borrowPayoutField = document.getElementById("position-borrow-payout-field");
 const borrowPayoutInput = document.getElementById("position-borrow-payout");
 const investedInput = document.getElementById("position-invested");
+const interestField = document.getElementById("position-interest-field");
 const interestInput = document.getElementById("position-interest");
+const currentField = document.getElementById("position-current-field");
 const currentInput = document.getElementById("position-current");
+const notesField = document.getElementById("position-notes-field");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
 const tableBody = document.getElementById("positions-body");
@@ -704,6 +708,13 @@ function updateActiveTableColumns() {
 function syncTypeSpecificFields(positionType) {
   const isPendle = positionType === "pendle";
   const isLending = positionType === "lending";
+  const isStrategy = positionType === "strategy";
+  if (strategyNameField) {
+    strategyNameField.hidden = isLending;
+  }
+  if (strategyNameInput) {
+    strategyNameInput.required = !isLending;
+  }
   if (maturityField) {
     maturityField.hidden = !isPendle;
   }
@@ -725,6 +736,15 @@ function syncTypeSpecificFields(positionType) {
   if (borrowPayoutField) {
     borrowPayoutField.hidden = !isLending;
   }
+  if (interestField) {
+    interestField.hidden = isLending;
+  }
+  if (currentField) {
+    currentField.hidden = false;
+  }
+  if (notesField) {
+    notesField.hidden = !isStrategy;
+  }
   if (!isLending) {
     if (collateralInput) {
       collateralInput.value = "";
@@ -735,6 +755,19 @@ function syncTypeSpecificFields(positionType) {
     if (borrowPayoutInput) {
       borrowPayoutInput.value = "";
     }
+  } else {
+    if (interestInput) {
+      interestInput.value = "";
+    }
+    if (notesInput) {
+      notesInput.value = "";
+    }
+    if (strategyNameInput) {
+      strategyNameInput.value = "";
+    }
+  }
+  if (!isStrategy && notesInput) {
+    notesInput.value = "";
   }
 }
 
@@ -1082,6 +1115,11 @@ function parseOptionalNumber(value) {
 }
 
 function syncCalculationInputs() {
+  if (activeTab === "lending") {
+    interestInput.disabled = true;
+    currentInput.disabled = false;
+    return;
+  }
   const hasInterestValue = interestInput.value.trim() !== "";
   const hasCurrentValue = currentInput.value.trim() !== "";
 
@@ -1209,6 +1247,7 @@ form.addEventListener("submit", (event) => {
   }
   if (next.type === "lending") {
     next.collateral = collateralInput?.value.trim() || "";
+    next.strategyName = next.collateral || "Lending Position";
     if (!next.collateral) {
       setStatus("Collateral ist fuer Lending/Borrow Positionen erforderlich.");
       return;
@@ -1231,7 +1270,7 @@ form.addEventListener("submit", (event) => {
     }
   }
 
-  if (!next.strategyName) {
+  if (next.type !== "lending" && !next.strategyName) {
     setStatus("Name der Strategie ist erforderlich.");
     return;
   }
@@ -1241,7 +1280,7 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  if (providedInterest !== null && Number.isNaN(providedInterest)) {
+  if (next.type !== "lending" && providedInterest !== null && Number.isNaN(providedInterest)) {
     setStatus("Zinsen müssen eine gültige Zahl sein.");
     return;
   }
@@ -1251,17 +1290,22 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  if (providedInterest !== null && providedCurrent !== null) {
+  if (next.type !== "lending" && providedInterest !== null && providedCurrent !== null) {
     setStatus("Bitte entweder Zinsen oder aktuellen Wert eintragen, nicht beides.");
     return;
   }
 
-  if (providedInterest === null && providedCurrent === null) {
+  if (next.type === "lending" && providedCurrent === null) {
+    setStatus("Aktueller Wert muss eingetragen werden.");
+    return;
+  }
+
+  if (next.type !== "lending" && providedInterest === null && providedCurrent === null) {
     setStatus("Bitte entweder Zinsen oder aktuellen Wert eintragen.");
     return;
   }
 
-  if (providedInterest !== null && providedInterest < 0) {
+  if (next.type !== "lending" && providedInterest !== null && providedInterest < 0) {
     setStatus("Zinsen müssen eine nicht-negative Zahl sein.");
     return;
   }
@@ -1271,7 +1315,11 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  if (providedInterest !== null) {
+  if (next.type === "lending") {
+    next.currentValue = providedCurrent;
+    next.interestAmount = next.currentValue - next.investedAmount;
+    next.calculationMode = "current";
+  } else if (providedInterest !== null) {
     next.interestAmount = providedInterest;
     next.currentValue = next.investedAmount + next.interestAmount;
     next.calculationMode = "interest";
