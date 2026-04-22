@@ -11,7 +11,6 @@
     <div class="bg-glow bg-glow-b" aria-hidden="true"></div>
 
     <header class="hero shell">
-      <p class="eyebrow">DEF-9 MVP</p>
       <h1>DeFi-Portfolio-Kommandozentrale</h1>
       <p class="subtitle">
         Einseitiges Dashboard zur manuellen DeFi-Positionsverwaltung über Kreditvergabe, Pendle PT und Strategiebücher.
@@ -30,10 +29,6 @@
         <section class="panel" aria-label="Portfolio-KPI-Übersicht">
           <h2>Portfolio-KPI-Übersicht</h2>
           <div class="kpi-grid">
-            <article>
-              <p class="label">Positionen gesamt</p>
-              <p id="kpi-count" class="value">0</p>
-            </article>
             <article>
               <p class="label">Aktueller Wert gesamt</p>
               <p id="kpi-current" class="value">$0</p>
@@ -103,7 +98,7 @@
         </section>
 
         <section class="panel" aria-label="Aktive Positionstabelle">
-          <h2>Aktive Positionen</h2>
+          <h2>Aktive Positionen <span id="active-positions-total" class="heading-count">(0)</span></h2>
           <div class="tabs" role="tablist" aria-label="Positions-Typ-Tabs">
             <button type="button" class="tab active" data-tab="all" role="tab" aria-selected="true">Alle</button>
             <button type="button" class="tab" data-tab="lending" role="tab" aria-selected="false">Kreditvergabe</button>

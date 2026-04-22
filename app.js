@@ -102,10 +102,10 @@ const walletNameInput = document.getElementById("wallet-name");
 const walletList = document.getElementById("wallet-list");
 const walletStatus = document.getElementById("wallet-status");
 
-const kpiCount = document.getElementById("kpi-count");
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
 const kpiCashflow = document.getElementById("kpi-cashflow");
+const activePositionsTotal = document.getElementById("active-positions-total");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("de-DE", {
@@ -384,15 +384,20 @@ function roiDisplay(entry) {
 
 function updateKpis() {
   const active = activePositions();
-  const totalCount = active.length;
   const totalCurrentValue = active.reduce((acc, item) => acc + Number(item.currentValue || 0), 0);
-  const avgApy = totalCount ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / totalCount : 0;
+  const avgApy = active.length ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / active.length : 0;
   const totalMonthlyCashflow = active.reduce((acc, item) => acc + computeMonthlyCashflow(item), 0);
 
-  kpiCount.textContent = String(totalCount);
   kpiCurrent.textContent = formatCurrency(totalCurrentValue);
   kpiApy.textContent = formatPercent(avgApy);
   kpiCashflow.textContent = formatCurrency(totalMonthlyCashflow);
+}
+
+function updatePositionCountLabel() {
+  if (!activePositionsTotal) {
+    return;
+  }
+  activePositionsTotal.textContent = `(${positions.length})`;
 }
 
 function renderWalletSelect() {
@@ -593,6 +598,7 @@ function renderArchivedTable() {
 
 function render() {
   updateKpis();
+  updatePositionCountLabel();
   renderActiveTable();
   renderArchivedTable();
   renderWalletSelect();
