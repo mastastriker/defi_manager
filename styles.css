@@ -249,6 +249,26 @@ th {
   font-weight: 600;
 }
 
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  text-align: inherit;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sort-indicator {
+  min-width: 0.7rem;
+  color: #8acfff;
+  line-height: 1;
+}
+
 td {
   color: var(--text);
 }

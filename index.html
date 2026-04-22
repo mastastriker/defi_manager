@@ -80,8 +80,8 @@
               <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
             </label>
             <label>
-              Aktueller Wert (USD)
-              <input id="position-current-value" type="number" min="0" step="0.01" placeholder="102500" required />
+              Zinsen (USD)
+              <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
             </label>
             <label class="span-full">
               Notizen
@@ -105,17 +105,78 @@
             <table>
               <thead>
                 <tr>
-                  <th>Datum</th>
-                  <th>Wallet</th>
-                  <th>Chain</th>
-                  <th>Projektname</th>
-                  <th>Name der Strategie</th>
-                  <th>Eingezahlter Betrag</th>
-                  <th>Aktueller Wert</th>
-                  <th>Aktuelles ROI in % und Dollar</th>
-                  <th>Cashflow pro Monat</th>
-                  <th>APY aufs Jahr gesehen</th>
-                  <th>Notizen</th>
+                  <th data-sort-table="active" data-sort-key="date" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="date">
+                      Datum
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="wallet" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="wallet">
+                      Wallet
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="chain" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="chain">
+                      Chain
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="projectName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="projectName">
+                      Projektname
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="strategyName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="strategyName">
+                      Name der Strategie
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="investedAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="investedAmount">
+                      Eingezahlter Betrag
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="currentValue" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="currentValue">
+                      Aktueller Wert
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="interestAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="interestAmount">
+                      Zinsen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="roiPercent" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="roiPercent">
+                      Aktuelles ROI in % und Dollar
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="monthlyCashflow" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="monthlyCashflow">
+                      Cashflow pro Monat
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="apyAnnual" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="apyAnnual">
+                      APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="notes" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="notes">
+                      Notizen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
                   <th>Aktion</th>
                 </tr>
               </thead>
@@ -133,18 +194,84 @@
             <table>
               <thead>
                 <tr>
-                  <th>Datum</th>
-                  <th>Wallet</th>
-                  <th>Chain</th>
-                  <th>Projektname</th>
-                  <th>Name der Strategie</th>
-                  <th>Eingezahlter Betrag</th>
-                  <th>Aktueller Wert</th>
-                  <th>Aktuelles ROI in % und Dollar</th>
-                  <th>Cashflow pro Monat</th>
-                  <th>APY aufs Jahr gesehen</th>
-                  <th>Notizen</th>
-                  <th>Archiviert am</th>
+                  <th data-sort-table="archive" data-sort-key="date" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="date">
+                      Datum
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="wallet" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="wallet">
+                      Wallet
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="chain" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="chain">
+                      Chain
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="projectName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="projectName">
+                      Projektname
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="strategyName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="strategyName">
+                      Name der Strategie
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="investedAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="investedAmount">
+                      Eingezahlter Betrag
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="currentValue" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="currentValue">
+                      Aktueller Wert
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="interestAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="interestAmount">
+                      Zinsen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="roiPercent" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="roiPercent">
+                      Aktuelles ROI in % und Dollar
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="monthlyCashflow" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="monthlyCashflow">
+                      Cashflow pro Monat
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="apyAnnual" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="apyAnnual">
+                      APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="notes" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="notes">
+                      Notizen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="archivedAt" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="archivedAt">
+                      Archiviert am
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
                   <th>Aktion</th>
                 </tr>
               </thead>

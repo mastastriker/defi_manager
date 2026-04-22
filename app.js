@@ -24,6 +24,7 @@ const initialPositions = [
     projectName: "Aave",
     strategyName: "USDC Lending Core",
     investedAmount: 910000,
+    interestAmount: 18000,
     currentValue: 928000,
     notes: "Blue-chip lending baseline",
     status: "active",
@@ -38,6 +39,7 @@ const initialPositions = [
     projectName: "Pendle",
     strategyName: "PT-ETH Dec 2026",
     investedAmount: 310000,
+    interestAmount: 24500,
     currentValue: 334500,
     notes: "Seasonal convexity thesis",
     status: "active",
@@ -52,6 +54,7 @@ const initialPositions = [
     projectName: "Morpho",
     strategyName: "Stablecoin Basis Loop",
     investedAmount: 220000,
+    interestAmount: 9500,
     currentValue: 229500,
     notes: "Low-vol carry",
     status: "active",
@@ -63,6 +66,10 @@ let positions = [];
 let activeTab = "all";
 let editingPositionId = null;
 let activePage = "dashboard";
+const sortState = {
+  active: { key: null, direction: "asc" },
+  archive: { key: null, direction: "asc" }
+};
 
 const form = document.getElementById("position-form");
 const typeInput = document.getElementById("position-type");
@@ -72,13 +79,14 @@ const chainInput = document.getElementById("position-chain");
 const projectInput = document.getElementById("position-project");
 const strategyNameInput = document.getElementById("position-strategy-name");
 const investedInput = document.getElementById("position-invested");
-const currentValueInput = document.getElementById("position-current-value");
+const interestInput = document.getElementById("position-interest");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
 const tableBody = document.getElementById("positions-body");
 const archivedBody = document.getElementById("archived-body");
 const tabs = Array.from(document.querySelectorAll(".tab"));
 const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
+const sortableHeaders = Array.from(document.querySelectorAll("th[data-sort-table][data-sort-key]"));
 const pageSections = {
   dashboard: document.getElementById("dashboard-page"),
   archive: document.getElementById("archive-page")
@@ -157,7 +165,13 @@ function normalizePosition(entry) {
     ? Number(entry.currentValue)
     : Number.isFinite(Number(entry?.notional))
       ? Number(entry.notional)
-      : 0;
+      : normalizedInvested;
+  const normalizedInterest = Number.isFinite(Number(entry?.interestAmount))
+    ? Number(entry.interestAmount)
+    : Number.isFinite(Number(entry?.interest))
+      ? Number(entry.interest)
+      : Math.max(0, normalizedCurrent - normalizedInvested);
+  const computedCurrent = normalizedInvested + normalizedInterest;
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -173,7 +187,8 @@ function normalizePosition(entry) {
           ? entry.name.trim()
           : "Unbenannte Position",
     investedAmount: normalizedInvested,
-    currentValue: normalizedCurrent,
+    interestAmount: normalizedInterest,
+    currentValue: computedCurrent,
     notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
     archivedAt: safeStatus === "archived" && typeof entry?.archivedAt === "string" ? entry.archivedAt : null
@@ -333,13 +348,93 @@ function filteredActivePositions() {
   return active.filter((entry) => entry.type === activeTab);
 }
 
+function getSortValue(entry, key) {
+  switch (key) {
+    case "date": {
+      const parsedDate = parsePositionDate(entry.date);
+      return parsedDate ? parsedDate.getTime() : 0;
+    }
+    case "wallet":
+    case "chain":
+    case "projectName":
+    case "strategyName":
+    case "notes":
+      return String(entry[key] || "");
+    case "investedAmount":
+    case "currentValue":
+    case "interestAmount":
+      return Number(entry[key] || 0);
+    case "roiPercent":
+      return computeRoiPercent(entry);
+    case "monthlyCashflow":
+      return computeMonthlyCashflow(entry);
+    case "apyAnnual":
+      return computeApyAnnual(entry);
+    case "archivedAt": {
+      const archivedDate = entry.archivedAt ? new Date(entry.archivedAt) : null;
+      return archivedDate && !Number.isNaN(archivedDate.getTime()) ? archivedDate.getTime() : 0;
+    }
+    default:
+      return String(entry[key] || "");
+  }
+}
+
+function sortRows(rows, tableName) {
+  const state = sortState[tableName];
+  if (!state?.key) {
+    return rows;
+  }
+
+  const factor = state.direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const aValue = getSortValue(a, state.key);
+    const bValue = getSortValue(b, state.key);
+    let result = 0;
+
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      result = aValue - bValue;
+    } else {
+      result = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: "base", numeric: true });
+    }
+
+    if (result !== 0) {
+      return result * factor;
+    }
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function updateSortUi() {
+  sortableHeaders.forEach((header) => {
+    const tableName = header.dataset.sortTable;
+    const key = header.dataset.sortKey;
+    const indicator = header.querySelector(".sort-indicator");
+    const state = tableName ? sortState[tableName] : null;
+    const isActive = Boolean(state && key && state.key === key);
+
+    if (!isActive) {
+      header.setAttribute("aria-sort", "none");
+      if (indicator) {
+        indicator.textContent = "";
+      }
+      return;
+    }
+
+    const isAscending = state.direction === "asc";
+    header.setAttribute("aria-sort", isAscending ? "ascending" : "descending");
+    if (indicator) {
+      indicator.textContent = isAscending ? "▲" : "▼";
+    }
+  });
+}
+
 function renderActiveTable() {
-  const rows = filteredActivePositions();
+  const rows = sortRows(filteredActivePositions(), "active");
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="12" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
+        <td colspan="13" class="empty">In diesem Bereich sind noch keine aktiven Positionen vorhanden.</td>
       </tr>
     `;
     return;
@@ -356,6 +451,7 @@ function renderActiveTable() {
         <td>${escapeHtml(row.strategyName)}</td>
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
@@ -374,12 +470,12 @@ function renderActiveTable() {
 }
 
 function renderArchivedTable() {
-  const rows = archivedPositions();
+  const rows = sortRows(archivedPositions(), "archive");
 
   if (rows.length === 0) {
     archivedBody.innerHTML = `
       <tr>
-        <td colspan="13" class="empty">Noch keine archivierten Positionen.</td>
+        <td colspan="14" class="empty">Noch keine archivierten Positionen.</td>
       </tr>
     `;
     return;
@@ -396,6 +492,7 @@ function renderArchivedTable() {
         <td>${escapeHtml(row.strategyName)}</td>
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
+        <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
@@ -482,6 +579,36 @@ pageTabs.forEach((tab) => {
   });
 });
 
+sortableHeaders.forEach((header) => {
+  const button = header.querySelector(".sort-btn");
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", () => {
+    const tableName = button.dataset.sortTable;
+    const key = button.dataset.sortKey;
+    if (!tableName || !key || !sortState[tableName]) {
+      return;
+    }
+
+    const state = sortState[tableName];
+    if (state.key === key) {
+      state.direction = state.direction === "asc" ? "desc" : "asc";
+    } else {
+      state.key = key;
+      state.direction = "asc";
+    }
+
+    updateSortUi();
+    if (tableName === "active") {
+      renderActiveTable();
+    } else {
+      renderArchivedTable();
+    }
+  });
+});
+
 form.addEventListener("submit", (event) => {
   event.preventDefault();
 
@@ -494,11 +621,13 @@ form.addEventListener("submit", (event) => {
     projectName: projectInput.value.trim(),
     strategyName: strategyNameInput.value.trim(),
     investedAmount: Number(investedInput.value),
-    currentValue: Number(currentValueInput.value),
+    interestAmount: Number(interestInput.value || 0),
     notes: notesInput.value.trim(),
     status: "active",
     archivedAt: null
   };
+
+  next.currentValue = next.investedAmount + next.interestAmount;
 
   if (!parsePositionDate(next.date)) {
     setStatus("Datum ist erforderlich.");
@@ -515,8 +644,8 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  if (Number.isNaN(next.currentValue) || next.currentValue < 0) {
-    setStatus("Der aktuelle Wert muss eine nicht-negative Zahl sein.");
+  if (Number.isNaN(next.interestAmount) || next.interestAmount < 0) {
+    setStatus("Zinsen müssen eine nicht-negative Zahl sein.");
     return;
   }
 
@@ -564,7 +693,7 @@ tableBody.addEventListener("click", (event) => {
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
     investedInput.value = String(position.investedAmount);
-    currentValueInput.value = String(position.currentValue);
+    interestInput.value = String(Number(position.interestAmount || 0));
     notesInput.value = position.notes || "";
     setFormMode(true);
     setStatus("Position wird bearbeitet.");
@@ -635,4 +764,5 @@ loadPositions();
 setPage(activePage);
 resetFormMode();
 render();
+updateSortUi();
 console.log("DEF-31 required column + editability update loaded");
