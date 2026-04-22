@@ -8,6 +8,8 @@
 - [ ] PR geht gegen `codex/v1` (oder `main` nur fuer Release von `codex/v1`)
 - [ ] Keine direkten Pushes auf `codex/v1` oder `main`
 - [ ] Sofort-Push-Regel eingehalten (alle lokalen Commits innerhalb der Vorgabe zu `origin` gepusht)
+- [ ] Push auf `origin` ist erfolgt
+- [ ] PR wurde direkt nach Push erstellt (oder `release_flow=off` ist explizit dokumentiert)
 - [ ] CEO-Freigabe liegt explizit vor (Kommentar/Anweisung verlinkt)
 - [ ] Label `ceo-approved` gesetzt
 - [ ] Bei Ziel-Branch `main`: CTO-Freigabe liegt ebenfalls explizit vor (4-Augen-Prinzip)

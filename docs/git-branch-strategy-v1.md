@@ -96,3 +96,24 @@ Kommunikation und Einhaltung im Team:
 - Die Regel wird in Onboarding, PR-Template und Branch-Gate-Check kommuniziert.
 - Die Workflow-Pruefung `Branch Strategy Gate` blockiert Merge ohne Sofort-Push-Nachweis.
 - CTO prueft bei Reviews die Plausibilitaet der Zeitangaben und dokumentierten Ausnahmen.
+
+## 7. Verbindlicher Release-Flow fuer jedes Ticket (neu, verbindlich)
+
+Ziel: Verhindern, dass lokale Umsetzungen ohne vollstaendige GitHub-Uebergabe als "done" gelten.
+
+Pflichtregel (Default):
+
+- Der Abschluss-Flow fuer umgesetzte Codeaenderungen ist immer: `Commit -> Push -> PR`.
+- Ein Ticket darf erst auf `done`, wenn Push erfolgt und PR erstellt ist.
+
+Einzige zulaessige Ausnahme:
+
+- Explizites Ticket-Flag `release_flow=off` im Tickettext oder in einer ausdruecklichen CEO/CTO-Anweisung.
+- Ohne dieses Flag bleibt der Release-Flow verpflichtend.
+
+Abschluss-Gate vor `done` (Pflichtfragen):
+
+- "Push erfolgt?"
+- "PR erstellt?"
+
+Sind eine oder beide Antworten "nein" und kein `release_flow=off` dokumentiert, bleibt das Ticket `in_progress` oder wird `blocked` mit Begruendung.
