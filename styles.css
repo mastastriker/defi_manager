@@ -22,7 +22,7 @@ body {
 }
 
 .shell {
-  width: calc(100% - 2rem);
+  width: calc(100% - 4rem);
   margin: 0 auto;
 }
 
