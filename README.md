@@ -5,7 +5,7 @@ This repository implements DEF-9 board-scoped v1:
 - Dark, minimal, single-page dashboard
 - Hero + KPI summary + positions table (strict scope)
 - Manual position entry only
-- Browser `localStorage` persistence
+- Browser `localStorage` persistence with migration-safe backup
 - No wallet integration, auth, analytics, alerts, or transactions in v1
 
 ## Run locally
@@ -29,7 +29,7 @@ Open: `http://localhost:4173`
 1. Use the `Manual Position Entry` form to add a position.
 2. Position appears in the table and KPI totals update immediately.
 3. Reload the page.
-4. Previously entered positions remain (saved in `localStorage` key `defi-dashboard-positions-v1`).
+4. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
 5. Delete a row to remove it and persist the removal.
 
 ## Archive flow (DEF-30)
@@ -45,7 +45,7 @@ Open: `http://localhost:4173`
 
 - Verified table tab filters: `All`, `Lending`, `Pendle PT`, `Strategies`.
 - Verified KPI summary recomputes on add/delete actions.
-- Verified localStorage fallback behavior: if stored payload is invalid, app resets to seed data.
+- Verified migration behavior: app can load legacy array payloads and new versioned payloads without dropping positions.
 
 ## Vercel deployment notes (GitHub auto deploy)
 

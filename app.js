@@ -1,4 +1,9 @@
-const STORAGE_KEY = "defi-dashboard-positions-v1";
+const STORAGE_KEYS = {
+  primary: "defi-dashboard-positions-v2",
+  legacy: "defi-dashboard-positions-v1",
+  backup: "defi-dashboard-positions-backup-v1"
+};
+const STORAGE_VERSION = 2;
 
 const TYPE_LABELS = {
   lending: "Kreditvergabe",
@@ -175,28 +180,74 @@ function normalizePosition(entry) {
   };
 }
 
-function loadPositions() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    positions = [...initialPositions];
-    savePositions();
-    return;
-  }
-
+function readStorage(key) {
   try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error("Stored data is not an array");
-    }
-    positions = parsed.map(normalizePosition);
+    return localStorage.getItem(key);
   } catch (_error) {
-    positions = [...initialPositions];
-    savePositions();
+    return null;
   }
 }
 
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function parseStoredPositions(raw) {
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = JSON.parse(raw);
+  const list = Array.isArray(parsed) ? parsed : parsed?.positions;
+  if (!Array.isArray(list)) {
+    return null;
+  }
+
+  const normalized = list.map(normalizePosition).filter(Boolean);
+  return normalized.length > 0 ? normalized : null;
+}
+
+function loadPositions() {
+  const storageOrder = [STORAGE_KEYS.primary, STORAGE_KEYS.legacy, STORAGE_KEYS.backup];
+  for (const key of storageOrder) {
+    const raw = readStorage(key);
+    if (!raw) {
+      continue;
+    }
+
+    try {
+      const parsed = parseStoredPositions(raw);
+      if (!parsed) {
+        continue;
+      }
+      positions = parsed;
+      savePositions();
+      return;
+    } catch (_error) {
+      continue;
+    }
+  }
+
+  positions = [...initialPositions];
+  savePositions();
+}
+
 function savePositions() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(positions));
+  const payload = JSON.stringify({
+    version: STORAGE_VERSION,
+    updatedAt: new Date().toISOString(),
+    positions
+  });
+  const legacyPayload = JSON.stringify(positions);
+
+  writeStorage(STORAGE_KEYS.primary, payload);
+  writeStorage(STORAGE_KEYS.legacy, legacyPayload);
+  writeStorage(STORAGE_KEYS.backup, legacyPayload);
 }
 
 function setStatus(message) {
