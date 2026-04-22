@@ -399,7 +399,7 @@ function updatePositionCountLabel() {
   if (!activePositionsTotal) {
     return;
   }
-  activePositionsTotal.textContent = `(${positions.length})`;
+  activePositionsTotal.textContent = `(${activePositions().length})`;
 }
 
 function renderWalletSelect() {
