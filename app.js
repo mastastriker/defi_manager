@@ -1307,7 +1307,7 @@ form.addEventListener("submit", (event) => {
     const debt = parseOptionalNumber(debtInput?.value || "");
     if (debt !== null) {
       if (Number.isNaN(debt) || debt < 0) {
-        setStatus("Schulden in $ muessen eine nicht-negative Zahl sein.");
+        setStatus("Borrow Schulden muessen eine nicht-negative Zahl sein.");
         return;
       }
       next.debtUsd = debt;
