@@ -32,6 +32,15 @@ Open: `http://localhost:4173`
 4. Previously entered positions remain (saved in `localStorage` key `defi-dashboard-positions-v1`).
 5. Delete a row to remove it and persist the removal.
 
+## Archive flow (DEF-30)
+
+1. On `Dashboard`, click `Archivieren` on an active row.
+2. Confirm the row disappears from active table + KPI aggregation.
+3. Switch to `Archiv` page via top navigation.
+4. Confirm archived row appears with archive timestamp.
+5. Click `Wiederherstellen` and verify it returns to `Dashboard` active table.
+6. Reload page and verify active/archive separation persists in `localStorage`.
+
 ## Verification notes
 
 - Verified table tab filters: `All`, `Lending`, `Pendle PT`, `Strategies`.
@@ -51,3 +60,4 @@ Open: `http://localhost:4173`
 - Wallet connection and protocol API integration
 - Authentication and user accounts
 - Alerts and transaction history modules
+- Analytics instrumentation
