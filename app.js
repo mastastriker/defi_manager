@@ -572,12 +572,23 @@ function computeBorrowCost(entry) {
 }
 
 function computeElapsedMonths(entry) {
-  const startDate = parsePositionDate(entry.date);
+  const normalizedDate = normalizeDateTimeValue(entry?.date);
+  if (!normalizedDate) {
+    return 0;
+  }
+  const startDate = new Date(normalizedDate);
   if (!startDate) {
     return 0;
   }
+  const startMs = startDate.getTime();
+  if (!Number.isFinite(startMs)) {
+    return 0;
+  }
   const now = new Date();
-  const elapsedMs = now.getTime() - startDate.getTime();
+  const elapsedMs = Math.abs(now.getTime() - startMs);
+  if (elapsedMs < MS_PER_HOUR) {
+    return 0;
+  }
   const elapsedHours = elapsedMs / MS_PER_HOUR;
   const elapsedMonths = elapsedHours / HOURS_PER_MONTH;
   if (!Number.isFinite(elapsedMonths) || elapsedMonths <= 0) {
@@ -599,17 +610,19 @@ function computeBorrowApy(entry) {
   if (debt <= 0) {
     return 0;
   }
+  const borrowCost = computeBorrowCost(entry);
+  if (borrowCost <= 0) {
+    return 0;
+  }
   const elapsedMonths = computeElapsedMonths(entry);
   if (!Number.isFinite(elapsedMonths) || elapsedMonths <= 0) {
     return 0;
   }
-  const monthlyBorrowCost = computeMonthlyBorrowCost(entry);
-  const monthlyRate = monthlyBorrowCost / debt;
-  if (!Number.isFinite(monthlyRate) || monthlyRate <= -1) {
+  const annualized = (borrowCost / debt) * (12 / elapsedMonths) * 100;
+  if (!Number.isFinite(annualized)) {
     return 0;
   }
-  const annualized = (Math.pow(1 + monthlyRate, 12) - 1) * 100;
-  return Number.isFinite(annualized) ? Math.max(-100, Math.min(annualized, 10000)) : 0;
+  return Math.max(0, Math.min(annualized, 100000));
 }
 
 function computeNetApy(entry) {
