@@ -27,7 +27,7 @@ Open: `http://localhost:4173`
 
 ## Manual-entry and persistence flow
 
-1. Use the `Manual Position Entry` form to add a position.
+1. Use the `Manual Position Entry` form to add a position (date/time with hour precision).
 2. Wallets are selected from the managed wallet dropdown (`Cash1` and `Cash2` defaults).
 3. Enter exactly one value: either `Zinsen (USD)` or `Aktueller Wert (USD)`.
 4. The other value is calculated automatically (`Aktueller Wert = Eingezahlt + Zinsen` / `Zinsen = Aktueller Wert - Eingezahlt`).
@@ -58,6 +58,7 @@ Open: `http://localhost:4173`
 - Verified table tab filters: `All`, `Lending`, `Pendle PT`, `Strategies`.
 - Verified sortable columns in active and archive tables (all data columns with asc/desc toggle).
 - Verified KPI summary recomputes on add/delete actions.
+- Verified date/time (`datetime-local`, hourly) is shown and stored in hour precision and APY/cashflow annualization uses elapsed hours.
 - Verified migration behavior: app can load legacy array payloads and new versioned payloads without dropping positions.
 
 ## Vercel deployment notes (GitHub auto deploy)

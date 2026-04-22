@@ -48,8 +48,8 @@
           <h2>Manuelle Positionserfassung</h2>
           <form id="position-form" class="entry-form">
             <label>
-              Datum
-              <input id="position-date" type="date" required />
+              Datum/Uhrzeit
+              <input id="position-date" type="datetime-local" step="3600" required />
             </label>
             <label>
               Wallet
@@ -74,7 +74,7 @@
             </label>
             <label id="position-maturity-field">
               Maturity (nur PT)
-              <input id="position-maturity" type="date" />
+              <input id="position-maturity" type="datetime-local" step="3600" />
             </label>
             <label id="position-pt-amount-field">
               PT-Anzahl (nur PT)
@@ -116,7 +116,7 @@
                 <tr>
                   <th data-sort-table="active" data-sort-key="date" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="date">
-                      Datum
+                      Datum/Uhrzeit
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
@@ -229,7 +229,7 @@
                 <tr>
                   <th data-sort-table="archive" data-sort-key="date" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="date">
-                      Datum
+                      Datum/Uhrzeit
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>

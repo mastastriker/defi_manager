@@ -23,12 +23,15 @@ const VALID_STATUSES = new Set(["active", "archived"]);
 const CHAIN_ORDER = ["ETH", "ARB", "BASE", "AVAX"];
 const SUPPORTED_CHAINS = new Set(CHAIN_ORDER);
 const DEFAULT_CHAIN = "ETH";
+const MS_PER_HOUR = 1000 * 60 * 60;
+const HOURS_PER_YEAR = 365.25 * 24;
+const HOURS_PER_MONTH = HOURS_PER_YEAR / 12;
 
 const initialPositions = [
   {
     id: crypto.randomUUID(),
     type: "lending",
-    date: "2026-01-10",
+    date: "2026-01-10T09:00",
     wallet: "Cash1",
     chain: "ETH",
     projectName: "Aave",
@@ -46,7 +49,7 @@ const initialPositions = [
   {
     id: crypto.randomUUID(),
     type: "pendle",
-    date: "2026-02-14",
+    date: "2026-02-14T13:00",
     wallet: "Cash2",
     chain: "ARB",
     projectName: "Pendle",
@@ -56,7 +59,7 @@ const initialPositions = [
     currentValue: 334500,
     calculationMode: "interest",
     ptAmount: 12.5,
-    maturityDate: "2026-12-31",
+    maturityDate: "2026-12-31T16:00",
     notes: "Seasonal convexity thesis",
     status: "active",
     archivedAt: null
@@ -64,7 +67,7 @@ const initialPositions = [
   {
     id: crypto.randomUUID(),
     type: "strategy",
-    date: "2026-03-02",
+    date: "2026-03-02T11:00",
     wallet: "Cash1",
     chain: "BASE",
     projectName: "Morpho",
@@ -160,7 +163,8 @@ function formatDate(value) {
     return "-";
   }
   return new Intl.DateTimeFormat("de-DE", {
-    dateStyle: "medium"
+    dateStyle: "medium",
+    timeStyle: "short"
   }).format(parsed);
 }
 
@@ -188,20 +192,74 @@ function escapeHtml(value) {
 }
 
 function parsePositionDate(value) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+  if (typeof value !== "string") {
     return null;
   }
-  const parsed = new Date(`${value}T00:00:00Z`);
+
+  const normalized = normalizeDateTimeValue(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const monthIndex = Number(match[2]) - 1;
+  const day = Number(match[3]);
+  const hours = Number(match[4]);
+  const minutes = Number(match[5]);
+
+  if (minutes !== 0) {
+    return null;
+  }
+
+  const parsed = new Date(year, monthIndex, day, hours, minutes, 0, 0);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== monthIndex ||
+    parsed.getDate() !== day ||
+    parsed.getHours() !== hours ||
+    parsed.getMinutes() !== minutes
+  ) {
+    return null;
+  }
+
   return parsed;
+}
+
+function normalizeDateTimeValue(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return `${trimmed}T00:00`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+  return null;
+}
+
+function localDateTimeNowHour() {
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}T${String(
+    now.getHours()
+  ).padStart(2, "0")}:00`;
 }
 
 function normalizePosition(entry) {
   const safeType = VALID_TYPES.has(entry?.type) ? entry.type : "lending";
   const safeStatus = VALID_STATUSES.has(entry?.status) ? entry.status : "active";
-  const normalizedDate = typeof entry?.date === "string" && parsePositionDate(entry.date) ? entry.date : new Date().toISOString().slice(0, 10);
+  const rawDate = typeof entry?.date === "string" ? normalizeDateTimeValue(entry.date) : null;
+  const normalizedDate = rawDate && parsePositionDate(rawDate) ? rawDate : localDateTimeNowHour();
   const normalizedInvested = Number.isFinite(Number(entry?.investedAmount))
     ? Number(entry.investedAmount)
     : Number.isFinite(Number(entry?.notional))
@@ -225,7 +283,7 @@ function normalizePosition(entry) {
     ? normalizedCurrent
     : normalizedInvested + normalizedInterest;
 
-  const rawMaturityDate = typeof entry?.maturityDate === "string" ? entry.maturityDate : entry?.maturity;
+  const rawMaturityDate = typeof entry?.maturityDate === "string" ? normalizeDateTimeValue(entry.maturityDate) : normalizeDateTimeValue(entry?.maturity);
   const normalizedMaturityDate = typeof rawMaturityDate === "string" && parsePositionDate(rawMaturityDate) ? rawMaturityDate : null;
   const normalizedPtAmount = Number.isFinite(Number(entry?.ptAmount))
     ? Math.max(0, Number(entry.ptAmount))
@@ -405,9 +463,9 @@ function computeApyAnnual(entry) {
 
   const now = new Date();
   const elapsedMs = now.getTime() - startDate.getTime();
-  const elapsedDays = Math.max(1, elapsedMs / (1000 * 60 * 60 * 24));
+  const elapsedHours = elapsedMs / MS_PER_HOUR;
 
-  if (!Number.isFinite(elapsedDays) || elapsedDays <= 0) {
+  if (!Number.isFinite(elapsedHours) || elapsedHours <= 0) {
     return 0;
   }
 
@@ -416,7 +474,7 @@ function computeApyAnnual(entry) {
     return 0;
   }
 
-  const annualized = (Math.pow(growthFactor, 365 / elapsedDays) - 1) * 100;
+  const annualized = (Math.pow(growthFactor, HOURS_PER_YEAR / elapsedHours) - 1) * 100;
   if (!Number.isFinite(annualized)) {
     return 0;
   }
@@ -440,9 +498,8 @@ function computeFixedMonthlyCashflow(entry) {
   }
 
   const durationMs = maturityDate.getTime() - startDate.getTime();
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const averageDaysPerMonth = 365.25 / 12;
-  const monthsUntilMaturity = durationMs / (msPerDay * averageDaysPerMonth);
+  const hoursUntilMaturity = durationMs / MS_PER_HOUR;
+  const monthsUntilMaturity = hoursUntilMaturity / HOURS_PER_MONTH;
 
   if (!Number.isFinite(monthsUntilMaturity) || monthsUntilMaturity <= 0) {
     return 0;
@@ -860,8 +917,7 @@ function resetFormMode() {
   form.reset();
   walletInput.value = fallbackWallet();
   chainInput.value = DEFAULT_CHAIN;
-  const today = new Date().toISOString().slice(0, 10);
-  dateInput.value = today;
+  dateInput.value = localDateTimeNowHour();
   syncMaturityField(activeTab);
   syncCalculationInputs();
   setFormMode(false);
@@ -958,7 +1014,7 @@ form.addEventListener("submit", (event) => {
   const next = {
     id: crypto.randomUUID(),
     type: editingPosition?.type || activeTab,
-    date: dateInput.value,
+    date: normalizeDateTimeValue(dateInput.value) || "",
     wallet: walletInput.value,
     chain: chainInput.value,
     projectName: projectInput.value.trim(),
@@ -977,16 +1033,17 @@ form.addEventListener("submit", (event) => {
   const providedCurrent = parseOptionalNumber(currentInput.value);
 
   if (!parsePositionDate(next.date)) {
-    setStatus("Datum ist erforderlich.");
+    setStatus("Datum/Uhrzeit ist erforderlich (stunden-genau, z.B. 2026-04-22T16:00).");
     return;
   }
 
   if (maturityInput?.value) {
-    if (!parsePositionDate(maturityInput.value)) {
-      setStatus("Maturity muss ein gültiges Datum sein.");
+    const normalizedMaturity = normalizeDateTimeValue(maturityInput.value);
+    if (!normalizedMaturity || !parsePositionDate(normalizedMaturity)) {
+      setStatus("Maturity muss ein gültiges Datum mit Uhrzeit auf Stunde sein.");
       return;
     }
-    next.maturityDate = maturityInput.value;
+    next.maturityDate = normalizedMaturity;
   }
 
   if (ptAmountInput?.value.trim()) {
@@ -1098,13 +1155,13 @@ tableBody.addEventListener("click", (event) => {
     }
 
     editingPositionId = id;
-    dateInput.value = position.date;
+    dateInput.value = normalizeDateTimeValue(position.date) || localDateTimeNowHour();
     walletInput.value = position.wallet;
     chainInput.value = position.chain;
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
     ptAmountInput.value = position.ptAmount === null || position.ptAmount === undefined ? "" : String(position.ptAmount);
-    maturityInput.value = position.maturityDate || "";
+    maturityInput.value = normalizeDateTimeValue(position.maturityDate || "") || "";
     investedInput.value = String(position.investedAmount);
     if (position.calculationMode === "current") {
       currentInput.value = String(Number(position.currentValue || 0));
