@@ -128,6 +128,7 @@ const kpiCashflow = document.getElementById("kpi-cashflow");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
 const activePtAmountHeader = document.getElementById("active-pt-amount-header");
+const activeFixedCashflowHeader = document.getElementById("active-fixed-cashflow-header");
 const activeMaturityHeader = document.getElementById("active-maturity-header");
 const activeRoiMaturityHeader = document.getElementById("active-roi-maturity-header");
 const activeNotesHeader = document.getElementById("active-notes-header");
@@ -431,6 +432,25 @@ function computeRoiAtMaturity(entry) {
   return Number(entry.ptAmount ?? 0) - Number(entry.investedAmount || 0);
 }
 
+function computeFixedMonthlyCashflow(entry) {
+  const startDate = parsePositionDate(entry.date);
+  const maturityDate = parsePositionDate(entry.maturityDate);
+  if (!startDate || !maturityDate) {
+    return 0;
+  }
+
+  const durationMs = maturityDate.getTime() - startDate.getTime();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  const averageDaysPerMonth = 365.25 / 12;
+  const monthsUntilMaturity = durationMs / (msPerDay * averageDaysPerMonth);
+
+  if (!Number.isFinite(monthsUntilMaturity) || monthsUntilMaturity <= 0) {
+    return 0;
+  }
+
+  return computeRoiAtMaturity(entry) / monthsUntilMaturity;
+}
+
 function roiDisplay(entry) {
   const roiPercent = computeRoiPercent(entry);
   const roiUsd = computeRoiUsd(entry);
@@ -470,6 +490,14 @@ function updateActiveTableColumns() {
     if (ptAmountButton instanceof HTMLButtonElement) {
       ptAmountButton.disabled = !showMaturity;
       ptAmountButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
+    }
+  }
+  if (activeFixedCashflowHeader) {
+    activeFixedCashflowHeader.hidden = !showMaturity;
+    const fixedCashflowButton = activeFixedCashflowHeader.querySelector(".sort-btn");
+    if (fixedCashflowButton instanceof HTMLButtonElement) {
+      fixedCashflowButton.disabled = !showMaturity;
+      fixedCashflowButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
     }
   }
   if (!activeMaturityHeader) {
@@ -605,6 +633,8 @@ function getSortValue(entry, key) {
       return computeRoiPercent(entry);
     case "monthlyCashflow":
       return computeMonthlyCashflow(entry);
+    case "fixedMonthlyCashflow":
+      return computeFixedMonthlyCashflow(entry);
     case "apyAnnual":
       return computeApyAnnual(entry);
     case "archivedAt": {
@@ -669,7 +699,7 @@ function renderActiveTable() {
   const rows = sortRows(filteredActivePositions(), "active");
   const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
   const showMaturity = isMaturityColumnVisible();
-  const tableColspan = showMaturity ? 15 : 13;
+  const tableColspan = showMaturity ? 16 : 13;
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
@@ -694,6 +724,7 @@ function renderActiveTable() {
         <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
+        ${showMaturity ? `<td>${formatCurrency(computeFixedMonthlyCashflow(row))}</td>` : ""}
         <td>${formatPercent(computeApyAnnual(row))}</td>
         ${showMaturity ? `<td>${formatQuantity(row.ptAmount)}</td>` : ""}
         ${showMaturity ? `<td>${formatCurrency(computeRoiAtMaturity(row))}</td>` : ""}
@@ -775,7 +806,13 @@ function setActiveTab(nextTab) {
   if (nextTab === "pendle" && sortState.active.key === "notes") {
     sortState.active.key = null;
   }
-  if (nextTab !== "pendle" && (sortState.active.key === "maturityDate" || sortState.active.key === "ptAmount" || sortState.active.key === "roiAtMaturity")) {
+  if (
+    nextTab !== "pendle" &&
+    (sortState.active.key === "maturityDate" ||
+      sortState.active.key === "ptAmount" ||
+      sortState.active.key === "roiAtMaturity" ||
+      sortState.active.key === "fixedMonthlyCashflow")
+  ) {
     sortState.active.key = null;
   }
   updateActiveTableColumns();
