@@ -37,6 +37,7 @@ const initialPositions = [
     interestAmount: 18000,
     currentValue: 928000,
     calculationMode: "interest",
+    ptAmount: null,
     maturityDate: null,
     notes: "Blue-chip lending baseline",
     status: "active",
@@ -54,6 +55,7 @@ const initialPositions = [
     interestAmount: 24500,
     currentValue: 334500,
     calculationMode: "interest",
+    ptAmount: 12.5,
     maturityDate: "2026-12-31",
     notes: "Seasonal convexity thesis",
     status: "active",
@@ -71,6 +73,7 @@ const initialPositions = [
     interestAmount: 9500,
     currentValue: 229500,
     calculationMode: "interest",
+    ptAmount: null,
     maturityDate: null,
     notes: "Low-vol carry",
     status: "active",
@@ -96,6 +99,8 @@ const projectInput = document.getElementById("position-project");
 const strategyNameInput = document.getElementById("position-strategy-name");
 const maturityField = document.getElementById("position-maturity-field");
 const maturityInput = document.getElementById("position-maturity");
+const ptAmountField = document.getElementById("position-pt-amount-field");
+const ptAmountInput = document.getElementById("position-pt-amount");
 const investedInput = document.getElementById("position-invested");
 const interestInput = document.getElementById("position-interest");
 const currentInput = document.getElementById("position-current");
@@ -122,6 +127,7 @@ const kpiApy = document.getElementById("kpi-apy");
 const kpiCashflow = document.getElementById("kpi-cashflow");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
+const activePtAmountHeader = document.getElementById("active-pt-amount-header");
 const activeMaturityHeader = document.getElementById("active-maturity-header");
 
 function formatCurrency(value) {
@@ -134,6 +140,15 @@ function formatCurrency(value) {
 
 function formatPercent(value) {
   return `${Number(value || 0).toFixed(2)}%`;
+}
+
+function formatQuantity(value) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  return new Intl.NumberFormat("de-DE", {
+    maximumFractionDigits: 6
+  }).format(Number(value));
 }
 
 function formatDate(value) {
@@ -209,6 +224,11 @@ function normalizePosition(entry) {
 
   const rawMaturityDate = typeof entry?.maturityDate === "string" ? entry.maturityDate : entry?.maturity;
   const normalizedMaturityDate = typeof rawMaturityDate === "string" && parsePositionDate(rawMaturityDate) ? rawMaturityDate : null;
+  const normalizedPtAmount = Number.isFinite(Number(entry?.ptAmount))
+    ? Math.max(0, Number(entry.ptAmount))
+    : Number.isFinite(Number(entry?.ptCount))
+      ? Math.max(0, Number(entry.ptCount))
+      : null;
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -233,6 +253,7 @@ function normalizePosition(entry) {
     interestAmount: computedInterest,
     currentValue: computedCurrent,
     calculationMode: normalizedCalculationMode,
+    ptAmount: normalizedPtAmount,
     maturityDate: normalizedMaturityDate,
     notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
@@ -437,6 +458,14 @@ function isMaturityColumnVisible() {
 
 function updateActiveTableColumns() {
   const showMaturity = isMaturityColumnVisible();
+  if (activePtAmountHeader) {
+    activePtAmountHeader.hidden = !showMaturity;
+    const ptAmountButton = activePtAmountHeader.querySelector(".sort-btn");
+    if (ptAmountButton instanceof HTMLButtonElement) {
+      ptAmountButton.disabled = !showMaturity;
+      ptAmountButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
+    }
+  }
   if (!activeMaturityHeader) {
     return;
   }
@@ -454,8 +483,14 @@ function syncMaturityField(positionType) {
   if (maturityField) {
     maturityField.hidden = !isPendle;
   }
+  if (ptAmountField) {
+    ptAmountField.hidden = !isPendle;
+  }
   if (!isPendle && maturityInput) {
     maturityInput.value = "";
+  }
+  if (!isPendle && ptAmountInput) {
+    ptAmountInput.value = "";
   }
 }
 
@@ -520,6 +555,8 @@ function getSortValue(entry, key) {
       const maturityDate = parsePositionDate(entry.maturityDate);
       return maturityDate ? maturityDate.getTime() : 0;
     }
+    case "ptAmount":
+      return Number(entry.ptAmount ?? 0);
     case "investedAmount":
     case "currentValue":
     case "interestAmount":
@@ -592,7 +629,7 @@ function renderActiveTable() {
   const rows = sortRows(filteredActivePositions(), "active");
   const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
   const showMaturity = isMaturityColumnVisible();
-  const tableColspan = showMaturity ? 14 : 13;
+  const tableColspan = showMaturity ? 15 : 13;
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
@@ -618,6 +655,7 @@ function renderActiveTable() {
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
+        ${showMaturity ? `<td>${formatQuantity(row.ptAmount)}</td>` : ""}
         ${showMaturity ? `<td>${formatDate(row.maturityDate)}</td>` : ""}
         <td>${escapeHtml(row.notes || "-")}</td>
         <td>
@@ -693,7 +731,7 @@ function setActiveTab(nextTab) {
   if (!editingPositionId) {
     syncMaturityField(nextTab);
   }
-  if (nextTab !== "pendle" && sortState.active.key === "maturityDate") {
+  if (nextTab !== "pendle" && (sortState.active.key === "maturityDate" || sortState.active.key === "ptAmount")) {
     sortState.active.key = null;
   }
   updateActiveTableColumns();
@@ -845,6 +883,7 @@ form.addEventListener("submit", (event) => {
     interestAmount: 0,
     currentValue: 0,
     calculationMode: "interest",
+    ptAmount: null,
     maturityDate: null,
     notes: notesInput.value.trim(),
     status: "active",
@@ -864,6 +903,15 @@ form.addEventListener("submit", (event) => {
       return;
     }
     next.maturityDate = maturityInput.value;
+  }
+
+  if (ptAmountInput?.value.trim()) {
+    const ptAmount = Number(ptAmountInput.value);
+    if (!Number.isFinite(ptAmount) || ptAmount < 0) {
+      setStatus("PT-Anzahl muss eine nicht-negative Zahl sein.");
+      return;
+    }
+    next.ptAmount = ptAmount;
   }
 
   if (!next.strategyName) {
@@ -971,6 +1019,7 @@ tableBody.addEventListener("click", (event) => {
     chainInput.value = position.chain;
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
+    ptAmountInput.value = position.ptAmount === null || position.ptAmount === undefined ? "" : String(position.ptAmount);
     maturityInput.value = position.maturityDate || "";
     investedInput.value = String(position.investedAmount);
     if (position.calculationMode === "current") {

@@ -76,6 +76,10 @@
               Maturity (nur PT)
               <input id="position-maturity" type="date" />
             </label>
+            <label id="position-pt-amount-field">
+              PT-Anzahl (nur PT)
+              <input id="position-pt-amount" type="number" min="0" step="0.000001" placeholder="12.5" />
+            </label>
             <label>
               Eingezahlter Betrag (USD)
               <input id="position-invested" type="number" min="0" step="0.01" placeholder="100000" required />
@@ -173,6 +177,12 @@
                   <th data-sort-table="active" data-sort-key="apyAnnual" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="apyAnnual">
                       APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-pt-amount-header" data-sort-table="active" data-sort-key="ptAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="ptAmount">
+                      PT-Anzahl
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
