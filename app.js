@@ -129,6 +129,7 @@ const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
 const activePtAmountHeader = document.getElementById("active-pt-amount-header");
 const activeMaturityHeader = document.getElementById("active-maturity-header");
+const activeMaturityDaysHeader = document.getElementById("active-maturity-days-header");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("de-DE", {
@@ -173,6 +174,13 @@ function formatArchiveTimestamp(value) {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(parsed);
+}
+
+function formatMaturityDays(value) {
+  if (!Number.isFinite(value)) {
+    return "-";
+  }
+  return String(Math.trunc(value));
 }
 
 function escapeHtml(value) {
@@ -425,6 +433,17 @@ function computeMonthlyCashflow(entry) {
   return (Number(entry.currentValue || 0) * computeApyAnnual(entry)) / 100 / 12;
 }
 
+function computeMaturityDays(entry) {
+  const maturityDate = parsePositionDate(entry.maturityDate);
+  if (!maturityDate) {
+    return null;
+  }
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const maturityUtc = Date.UTC(maturityDate.getUTCFullYear(), maturityDate.getUTCMonth(), maturityDate.getUTCDate());
+  return Math.ceil((maturityUtc - todayUtc) / (1000 * 60 * 60 * 24));
+}
+
 function roiDisplay(entry) {
   const roiPercent = computeRoiPercent(entry);
   const roiUsd = computeRoiUsd(entry);
@@ -467,6 +486,14 @@ function updateActiveTableColumns() {
     }
   }
   if (!activeMaturityHeader) {
+    if (activeMaturityDaysHeader) {
+      activeMaturityDaysHeader.hidden = !showMaturity;
+      const maturityDaysButton = activeMaturityDaysHeader.querySelector(".sort-btn");
+      if (maturityDaysButton instanceof HTMLButtonElement) {
+        maturityDaysButton.disabled = !showMaturity;
+        maturityDaysButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
+      }
+    }
     return;
   }
 
@@ -475,6 +502,14 @@ function updateActiveTableColumns() {
   if (maturityButton instanceof HTMLButtonElement) {
     maturityButton.disabled = !showMaturity;
     maturityButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
+  }
+  if (activeMaturityDaysHeader) {
+    activeMaturityDaysHeader.hidden = !showMaturity;
+    const maturityDaysButton = activeMaturityDaysHeader.querySelector(".sort-btn");
+    if (maturityDaysButton instanceof HTMLButtonElement) {
+      maturityDaysButton.disabled = !showMaturity;
+      maturityDaysButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
+    }
   }
 }
 
@@ -555,6 +590,10 @@ function getSortValue(entry, key) {
       const maturityDate = parsePositionDate(entry.maturityDate);
       return maturityDate ? maturityDate.getTime() : 0;
     }
+    case "maturityDays": {
+      const maturityDays = computeMaturityDays(entry);
+      return Number.isFinite(maturityDays) ? maturityDays : Number.MAX_SAFE_INTEGER;
+    }
     case "ptAmount":
       return Number(entry.ptAmount ?? 0);
     case "investedAmount":
@@ -629,7 +668,7 @@ function renderActiveTable() {
   const rows = sortRows(filteredActivePositions(), "active");
   const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
   const showMaturity = isMaturityColumnVisible();
-  const tableColspan = showMaturity ? 15 : 13;
+  const tableColspan = showMaturity ? 16 : 13;
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
@@ -657,6 +696,7 @@ function renderActiveTable() {
         <td>${formatPercent(computeApyAnnual(row))}</td>
         ${showMaturity ? `<td>${formatQuantity(row.ptAmount)}</td>` : ""}
         ${showMaturity ? `<td>${formatDate(row.maturityDate)}</td>` : ""}
+        ${showMaturity ? `<td>${formatMaturityDays(computeMaturityDays(row))}</td>` : ""}
         <td>${escapeHtml(row.notes || "-")}</td>
         <td>
           <div class="row-actions">
@@ -731,7 +771,7 @@ function setActiveTab(nextTab) {
   if (!editingPositionId) {
     syncMaturityField(nextTab);
   }
-  if (nextTab !== "pendle" && (sortState.active.key === "maturityDate" || sortState.active.key === "ptAmount")) {
+  if (nextTab !== "pendle" && (sortState.active.key === "maturityDate" || sortState.active.key === "ptAmount" || sortState.active.key === "maturityDays")) {
     sortState.active.key = null;
   }
   updateActiveTableColumns();
