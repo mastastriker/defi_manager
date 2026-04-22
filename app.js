@@ -413,7 +413,8 @@ function renderWalletList() {
       (wallet) => `
       <li>
         <span>${escapeHtml(wallet)}</span>
-        <button type="button" class="delete-wallet-btn" data-wallet="${escapeHtml(wallet)}">Löschen</button>
+        <button type="button" class="wallet-action-btn edit-wallet-btn" data-wallet="${escapeHtml(wallet)}">Bearbeiten</button>
+        <button type="button" class="wallet-action-btn delete-wallet-btn" data-wallet="${escapeHtml(wallet)}">Löschen</button>
       </li>
     `
     )
@@ -876,12 +877,60 @@ walletForm?.addEventListener("submit", (event) => {
 
 walletList?.addEventListener("click", (event) => {
   const target = event.target;
-  if (!(target instanceof HTMLElement) || !target.classList.contains("delete-wallet-btn")) {
+  if (!(target instanceof HTMLElement)) {
     return;
   }
 
   const walletName = target.dataset.wallet;
   if (!walletName || !wallets.includes(walletName)) {
+    return;
+  }
+
+  if (target.classList.contains("edit-wallet-btn")) {
+    const input = window.prompt("Neuer Wallet-Name:", walletName);
+    if (input === null) {
+      return;
+    }
+
+    const nextWalletName = input.trim();
+    if (!nextWalletName) {
+      setWalletStatus("Wallet-Name ist erforderlich.");
+      return;
+    }
+
+    if (nextWalletName.length > 40) {
+      setWalletStatus("Wallet-Name darf maximal 40 Zeichen haben.");
+      return;
+    }
+
+    if (nextWalletName === walletName) {
+      setWalletStatus("Wallet-Name unverändert.");
+      return;
+    }
+
+    const exists = wallets.some(
+      (wallet) => wallet.toLowerCase() === nextWalletName.toLowerCase() && wallet !== walletName
+    );
+    if (exists) {
+      setWalletStatus("Wallet existiert bereits.");
+      return;
+    }
+
+    const shouldKeepSelection = walletInput?.value === walletName;
+    wallets = wallets.map((wallet) => (wallet === walletName ? nextWalletName : wallet));
+    positions = positions.map((entry) => (entry.wallet === walletName ? { ...entry, wallet: nextWalletName } : entry));
+
+    saveWallets();
+    savePositions();
+    render();
+    if (shouldKeepSelection && walletInput) {
+      walletInput.value = nextWalletName;
+    }
+    setWalletStatus(`Wallet "${walletName}" umbenannt zu "${nextWalletName}".`);
+    return;
+  }
+
+  if (!target.classList.contains("delete-wallet-btn")) {
     return;
   }
 
@@ -909,4 +958,4 @@ setPage(activePage);
 resetFormMode();
 render();
 updateSortUi();
-console.log("DEF-55 wallets update loaded");
+console.log("DEF-66 wallet rename update loaded");

@@ -265,7 +265,7 @@ select {
   gap: 0.7rem;
 }
 
-.delete-wallet-btn {
+.wallet-action-btn {
   border: 1px solid var(--line);
   background: rgba(15, 25, 43, 0.75);
   color: #d7e4ff;
