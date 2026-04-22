@@ -1,0 +1,128 @@
+name: Branch Strategy Gate
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, edited]
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate target branch and CEO approval
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const CEO_REVIEWER = "mastastriker";
+            const CTO_REVIEWER = "paperclip-cto";
+            const pr = context.payload.pull_request;
+            const base = pr.base.ref;
+            const head = pr.head.ref;
+            const labels = (pr.labels || []).map((l) => l.name);
+            const hasCeoApprovalLabel = labels.includes("ceo-approved");
+            const body = pr.body || "";
+
+            const requireBodyPattern = (pattern, errorMessage) => {
+              if (!pattern.test(body)) {
+                core.setFailed(errorMessage);
+                return false;
+              }
+              return true;
+            };
+
+            if (!["codex/v1", "main"].includes(base)) {
+              core.setFailed(
+                `Unzulaessiger Ziel-Branch '${base}'. Erlaubt sind nur 'codex/v1' oder 'main'.`,
+              );
+              return;
+            }
+
+            if (base === "main" && head !== "codex/v1") {
+              core.setFailed(
+                "PRs nach 'main' muessen ausschliesslich von 'codex/v1' kommen.",
+              );
+              return;
+            }
+
+            if (!hasCeoApprovalLabel) {
+              core.setFailed(
+                "CEO-Freigabe fehlt: Label 'ceo-approved' ist Pflicht.",
+              );
+              return;
+            }
+
+            if (
+              !requireBodyPattern(
+                /-\s*\[[xX]\]\s*Sofort-Push-Regel eingehalten/i,
+                "Sofort-Push-Regel nicht bestaetigt: Checklisteintrag '- [x] Sofort-Push-Regel eingehalten ...' fehlt.",
+              )
+            ) {
+              return;
+            }
+
+            if (
+              !requireBodyPattern(
+                /Erster lokaler Commit-Zeitpunkt \(UTC, ISO 8601\):[\s\S]*?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)/i,
+                "Sofort-Push-Nachweis unvollstaendig: ISO-8601 UTC Zeitstempel fuer 'Erster lokaler Commit-Zeitpunkt' fehlt.",
+              )
+            ) {
+              return;
+            }
+
+            if (
+              !requireBodyPattern(
+                /Push-Zeitpunkt nach letztem lokalen Commit \(UTC, ISO 8601\):[\s\S]*?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)/i,
+                "Sofort-Push-Nachweis unvollstaendig: ISO-8601 UTC Zeitstempel fuer 'Push-Zeitpunkt nach letztem lokalen Commit' fehlt.",
+              )
+            ) {
+              return;
+            }
+
+            if (
+              !requireBodyPattern(
+                /Ausnahme dokumentiert\?\s*\(`none` oder kurze Begruendung inkl\. Massnahmen\):[\s\S]*?\b(none|[A-Za-z0-9][^\n]{5,})/i,
+                "Sofort-Push-Nachweis unvollstaendig: Feld 'Ausnahme dokumentiert?' muss mit 'none' oder Begruendung befuellt sein.",
+              )
+            ) {
+              return;
+            }
+
+            if (base === "main") {
+              const { owner, repo } = context.repo;
+              const reviews = await github.paginate(
+                github.rest.pulls.listReviews,
+                {
+                  owner,
+                  repo,
+                  pull_number: pr.number,
+                  per_page: 100,
+                },
+              );
+
+              const latestStateByUser = new Map();
+              for (const review of reviews) {
+                const login = review?.user?.login;
+                if (!login) continue;
+                latestStateByUser.set(login.toLowerCase(), review.state);
+              }
+
+              const approvals = new Set();
+              for (const [login, state] of latestStateByUser.entries()) {
+                if (state === "APPROVED") approvals.add(login);
+              }
+
+              if (!approvals.has(CEO_REVIEWER.toLowerCase())) {
+                core.setFailed(
+                  `4-Augen-Regel verletzt: CEO-Approval von '${CEO_REVIEWER}' fehlt.`,
+                );
+                return;
+              }
+
+              if (!approvals.has(CTO_REVIEWER.toLowerCase())) {
+                core.setFailed(
+                  `4-Augen-Regel verletzt: CTO-Approval von '${CTO_REVIEWER}' fehlt.`,
+                );
+                return;
+              }
+            }
+
+            core.info("Branch strategy validated.");
