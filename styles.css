@@ -88,6 +88,37 @@ main {
   padding-bottom: 2rem;
 }
 
+.top-nav {
+  display: flex;
+  gap: 0.55rem;
+  margin: 0 auto 0.8rem;
+}
+
+.page-tab {
+  border: 1px solid var(--line);
+  background: rgba(11, 20, 35, 0.66);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.page-tab.active {
+  background: rgba(53, 200, 255, 0.18);
+  border-color: rgba(53, 200, 255, 0.5);
+  color: var(--text);
+}
+
+.page-section {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.page-section[hidden] {
+  display: none;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: 1rem;
@@ -129,7 +160,7 @@ main {
 
 .entry-form {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
   align-items: end;
 }
@@ -159,6 +190,11 @@ select {
   font-weight: 700;
   padding: 0.65rem 0.8rem;
   cursor: pointer;
+}
+
+.entry-form .span-full,
+.entry-form .btn-primary {
+  grid-column: 1 / -1;
 }
 
 .form-status {
@@ -197,7 +233,7 @@ select {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 620px;
+  min-width: 1560px;
 }
 
 th,
@@ -226,6 +262,39 @@ td {
   cursor: pointer;
 }
 
+.edit-btn {
+  border: 1px solid rgba(53, 200, 255, 0.45);
+  background: rgba(53, 200, 255, 0.14);
+  color: #d7f4ff;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.52rem;
+  cursor: pointer;
+}
+
+.archive-btn {
+  border: 1px solid rgba(145, 227, 165, 0.5);
+  background: rgba(31, 110, 56, 0.3);
+  color: #ddffe6;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.52rem;
+  cursor: pointer;
+}
+
+.restore-btn {
+  border: 1px solid rgba(255, 205, 109, 0.52);
+  background: rgba(161, 94, 29, 0.28);
+  color: #ffe8bd;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.52rem;
+  cursor: pointer;
+}
+
+.row-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
 .empty {
   color: var(--muted);
 }
@@ -241,13 +310,13 @@ footer {
   .entry-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .entry-form .btn-primary {
-    grid-column: 1 / -1;
-  }
 }
 
 @media (max-width: 700px) {
+  .top-nav {
+    flex-wrap: wrap;
+  }
+
   .kpi-grid {
     grid-template-columns: 1fr;
   }
@@ -255,5 +324,4 @@ footer {
   .entry-form {
     grid-template-columns: 1fr;
   }
-
 }
