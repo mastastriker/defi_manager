@@ -133,9 +133,14 @@ main {
   color: #ccd7f0;
 }
 
+.heading-count {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.7rem;
 }
 
@@ -228,6 +233,50 @@ select {
 
 .table-wrap {
   overflow-x: auto;
+}
+
+.wallet-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.65rem;
+  align-items: end;
+  max-width: 640px;
+}
+
+.wallet-form label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.wallet-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  max-width: 640px;
+}
+
+.wallet-list li {
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: rgba(4, 9, 20, 0.82);
+  padding: 0.55rem 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.wallet-action-btn {
+  border: 1px solid var(--line);
+  background: rgba(15, 25, 43, 0.75);
+  color: #d7e4ff;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.52rem;
+  cursor: pointer;
 }
 
 table {
@@ -327,6 +376,10 @@ footer {
 }
 
 @media (max-width: 940px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .entry-form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -342,6 +395,10 @@ footer {
   }
 
   .entry-form {
+    grid-template-columns: 1fr;
+  }
+
+  .wallet-form {
     grid-template-columns: 1fr;
   }
 }

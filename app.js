@@ -3,7 +3,9 @@ const STORAGE_KEYS = {
   legacy: "defi-dashboard-positions-v1",
   backup: "defi-dashboard-positions-backup-v1"
 };
+const WALLET_STORAGE_KEY = "defi-dashboard-wallets-v1";
 const STORAGE_VERSION = 2;
+const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
 const TYPE_LABELS = {
   lending: "Kreditvergabe",
@@ -13,13 +15,15 @@ const TYPE_LABELS = {
 
 const VALID_TYPES = new Set(["lending", "pendle", "strategy"]);
 const VALID_STATUSES = new Set(["active", "archived"]);
+const SUPPORTED_CHAINS = new Set(["ETH", "BASE", "ARB", "AVAX"]);
+const DEFAULT_CHAIN = "ETH";
 
 const initialPositions = [
   {
     id: crypto.randomUUID(),
     type: "lending",
     date: "2026-01-10",
-    wallet: "Ledger 1",
+    wallet: "Cash1",
     chain: "ETH",
     projectName: "Aave",
     strategyName: "USDC Lending Core",
@@ -34,7 +38,7 @@ const initialPositions = [
     id: crypto.randomUUID(),
     type: "pendle",
     date: "2026-02-14",
-    wallet: "Safe Treasury",
+    wallet: "Cash2",
     chain: "ARB",
     projectName: "Pendle",
     strategyName: "PT-ETH Dec 2026",
@@ -49,7 +53,7 @@ const initialPositions = [
     id: crypto.randomUUID(),
     type: "strategy",
     date: "2026-03-02",
-    wallet: "Hot Wallet",
+    wallet: "Cash1",
     chain: "BASE",
     projectName: "Morpho",
     strategyName: "Stablecoin Basis Loop",
@@ -63,6 +67,7 @@ const initialPositions = [
 ];
 
 let positions = [];
+let wallets = [];
 let activeTab = "all";
 let editingPositionId = null;
 let activePage = "dashboard";
@@ -89,12 +94,18 @@ const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
 const sortableHeaders = Array.from(document.querySelectorAll("th[data-sort-table][data-sort-key]"));
 const pageSections = {
   dashboard: document.getElementById("dashboard-page"),
-  archive: document.getElementById("archive-page")
+  archive: document.getElementById("archive-page"),
+  wallets: document.getElementById("wallets-page")
 };
+const walletForm = document.getElementById("wallet-form");
+const walletNameInput = document.getElementById("wallet-name");
+const walletList = document.getElementById("wallet-list");
+const walletStatus = document.getElementById("wallet-status");
 
-const kpiCount = document.getElementById("kpi-count");
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
+const kpiCashflow = document.getElementById("kpi-cashflow");
+const activePositionsTotal = document.getElementById("active-positions-total");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("de-DE", {
@@ -177,8 +188,14 @@ function normalizePosition(entry) {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
     type: safeType,
     date: normalizedDate,
-    wallet: typeof entry?.wallet === "string" && entry.wallet.trim() ? entry.wallet.trim() : "Main Wallet",
-    chain: typeof entry?.chain === "string" && entry.chain.trim() ? entry.chain.trim().toUpperCase() : "ETH",
+    wallet:
+      typeof entry?.wallet === "string" && entry.wallet.trim() && wallets.includes(entry.wallet.trim())
+        ? entry.wallet.trim()
+        : fallbackWallet(),
+    chain:
+      typeof entry?.chain === "string" && SUPPORTED_CHAINS.has(entry.chain.trim().toUpperCase())
+        ? entry.chain.trim().toUpperCase()
+        : DEFAULT_CHAIN,
     projectName: typeof entry?.projectName === "string" && entry.projectName.trim() ? entry.projectName.trim() : TYPE_LABELS[safeType],
     strategyName:
       typeof entry?.strategyName === "string" && entry.strategyName.trim()
@@ -212,6 +229,38 @@ function writeStorage(key, value) {
   }
 }
 
+function setWalletStatus(message) {
+  if (walletStatus) {
+    walletStatus.textContent = message;
+  }
+}
+
+function loadWallets() {
+  const raw = readStorage(WALLET_STORAGE_KEY);
+  if (!raw) {
+    wallets = [...DEFAULT_WALLETS];
+    saveWallets();
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      throw new Error("Wallet payload invalid");
+    }
+    const cleaned = parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
+    wallets = cleaned.length > 0 ? cleaned : [...DEFAULT_WALLETS];
+  } catch (_error) {
+    wallets = [...DEFAULT_WALLETS];
+  }
+
+  saveWallets();
+}
+
+function saveWallets() {
+  writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
+}
+
 function parseStoredPositions(raw) {
   if (!raw) {
     return null;
@@ -225,6 +274,10 @@ function parseStoredPositions(raw) {
 
   const normalized = list.map(normalizePosition).filter(Boolean);
   return normalized.length > 0 ? normalized : null;
+}
+
+function fallbackWallet() {
+  return wallets[0] || DEFAULT_WALLETS[0];
 }
 
 function loadPositions() {
@@ -331,13 +384,46 @@ function roiDisplay(entry) {
 
 function updateKpis() {
   const active = activePositions();
-  const totalCount = active.length;
   const totalCurrentValue = active.reduce((acc, item) => acc + Number(item.currentValue || 0), 0);
-  const avgApy = totalCount ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / totalCount : 0;
+  const avgApy = active.length ? active.reduce((acc, item) => acc + computeApyAnnual(item), 0) / active.length : 0;
+  const totalMonthlyCashflow = active.reduce((acc, item) => acc + computeMonthlyCashflow(item), 0);
 
-  kpiCount.textContent = String(totalCount);
   kpiCurrent.textContent = formatCurrency(totalCurrentValue);
   kpiApy.textContent = formatPercent(avgApy);
+  kpiCashflow.textContent = formatCurrency(totalMonthlyCashflow);
+}
+
+function updatePositionCountLabel() {
+  if (!activePositionsTotal) {
+    return;
+  }
+  activePositionsTotal.textContent = `(${positions.length})`;
+}
+
+function renderWalletSelect() {
+  if (!walletInput) {
+    return;
+  }
+  const selected = walletInput.value;
+  walletInput.innerHTML = wallets.map((wallet) => `<option value="${escapeHtml(wallet)}">${escapeHtml(wallet)}</option>`).join("");
+  walletInput.value = wallets.includes(selected) ? selected : fallbackWallet();
+}
+
+function renderWalletList() {
+  if (!walletList) {
+    return;
+  }
+  walletList.innerHTML = wallets
+    .map(
+      (wallet) => `
+      <li>
+        <span>${escapeHtml(wallet)}</span>
+        <button type="button" class="wallet-action-btn edit-wallet-btn" data-wallet="${escapeHtml(wallet)}">Bearbeiten</button>
+        <button type="button" class="wallet-action-btn delete-wallet-btn" data-wallet="${escapeHtml(wallet)}">Löschen</button>
+      </li>
+    `
+    )
+    .join("");
 }
 
 function filteredActivePositions() {
@@ -512,8 +598,11 @@ function renderArchivedTable() {
 
 function render() {
   updateKpis();
+  updatePositionCountLabel();
   renderActiveTable();
   renderArchivedTable();
+  renderWalletSelect();
+  renderWalletList();
 }
 
 function setActiveTab(nextTab) {
@@ -562,6 +651,8 @@ function resetFormMode() {
   editingPositionId = null;
   form.reset();
   typeInput.value = "lending";
+  walletInput.value = fallbackWallet();
+  chainInput.value = DEFAULT_CHAIN;
   const today = new Date().toISOString().slice(0, 10);
   dateInput.value = today;
   setFormMode(false);
@@ -616,8 +707,8 @@ form.addEventListener("submit", (event) => {
     id: crypto.randomUUID(),
     type: typeInput.value,
     date: dateInput.value,
-    wallet: walletInput.value.trim(),
-    chain: chainInput.value.trim().toUpperCase(),
+    wallet: walletInput.value,
+    chain: chainInput.value,
     projectName: projectInput.value.trim(),
     strategyName: strategyNameInput.value.trim(),
     investedAmount: Number(investedInput.value),
@@ -649,8 +740,16 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  next.wallet = next.wallet || "Main Wallet";
-  next.chain = next.chain || "ETH";
+  if (!wallets.includes(next.wallet)) {
+    setStatus("Bitte eine gültige Wallet aus der Liste wählen.");
+    return;
+  }
+
+  if (!SUPPORTED_CHAINS.has(next.chain)) {
+    setStatus("Bitte eine gültige Chain aus der Liste wählen.");
+    return;
+  }
+
   next.projectName = next.projectName || TYPE_LABELS[next.type] || "Projekt";
 
   if (editingPositionId) {
@@ -760,9 +859,109 @@ archivedBody.addEventListener("click", (event) => {
   }
 });
 
+walletForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const nextWallet = walletNameInput?.value.trim() || "";
+  if (!nextWallet) {
+    setWalletStatus("Wallet-Name ist erforderlich.");
+    return;
+  }
+
+  const exists = wallets.some((wallet) => wallet.toLowerCase() === nextWallet.toLowerCase());
+  if (exists) {
+    setWalletStatus("Wallet existiert bereits.");
+    return;
+  }
+
+  wallets.push(nextWallet);
+  saveWallets();
+  renderWalletSelect();
+  renderWalletList();
+  walletForm.reset();
+  setWalletStatus(`Wallet "${nextWallet}" hinzugefügt.`);
+});
+
+walletList?.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) {
+    return;
+  }
+
+  const walletName = target.dataset.wallet;
+  if (!walletName || !wallets.includes(walletName)) {
+    return;
+  }
+
+  if (target.classList.contains("edit-wallet-btn")) {
+    const input = window.prompt("Neuer Wallet-Name:", walletName);
+    if (input === null) {
+      return;
+    }
+
+    const nextWalletName = input.trim();
+    if (!nextWalletName) {
+      setWalletStatus("Wallet-Name ist erforderlich.");
+      return;
+    }
+
+    if (nextWalletName.length > 40) {
+      setWalletStatus("Wallet-Name darf maximal 40 Zeichen haben.");
+      return;
+    }
+
+    if (nextWalletName === walletName) {
+      setWalletStatus("Wallet-Name unverändert.");
+      return;
+    }
+
+    const exists = wallets.some(
+      (wallet) => wallet.toLowerCase() === nextWalletName.toLowerCase() && wallet !== walletName
+    );
+    if (exists) {
+      setWalletStatus("Wallet existiert bereits.");
+      return;
+    }
+
+    const shouldKeepSelection = walletInput?.value === walletName;
+    wallets = wallets.map((wallet) => (wallet === walletName ? nextWalletName : wallet));
+    positions = positions.map((entry) => (entry.wallet === walletName ? { ...entry, wallet: nextWalletName } : entry));
+
+    saveWallets();
+    savePositions();
+    render();
+    if (shouldKeepSelection && walletInput) {
+      walletInput.value = nextWalletName;
+    }
+    setWalletStatus(`Wallet "${walletName}" umbenannt zu "${nextWalletName}".`);
+    return;
+  }
+
+  if (!target.classList.contains("delete-wallet-btn")) {
+    return;
+  }
+
+  if (wallets.length <= 1) {
+    setWalletStatus("Mindestens eine Wallet muss bestehen bleiben.");
+    return;
+  }
+
+  const inUse = positions.some((entry) => entry.wallet === walletName);
+  if (inUse) {
+    setWalletStatus(`Wallet "${walletName}" wird noch in Positionen verwendet.`);
+    return;
+  }
+
+  wallets = wallets.filter((wallet) => wallet !== walletName);
+  saveWallets();
+  renderWalletSelect();
+  renderWalletList();
+  setWalletStatus(`Wallet "${walletName}" gelöscht.`);
+});
+
+loadWallets();
 loadPositions();
 setPage(activePage);
 resetFormMode();
 render();
 updateSortUi();
-console.log("DEF-31 required column + editability update loaded");
+console.log("DEF-66 wallet rename update loaded");
