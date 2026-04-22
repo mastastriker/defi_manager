@@ -63,6 +63,10 @@ let positions = [];
 let activeTab = "all";
 let editingPositionId = null;
 let activePage = "dashboard";
+const sortState = {
+  active: { key: null, direction: "asc" },
+  archive: { key: null, direction: "asc" }
+};
 
 const form = document.getElementById("position-form");
 const typeInput = document.getElementById("position-type");
@@ -79,6 +83,7 @@ const tableBody = document.getElementById("positions-body");
 const archivedBody = document.getElementById("archived-body");
 const tabs = Array.from(document.querySelectorAll(".tab"));
 const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
+const sortableHeaders = Array.from(document.querySelectorAll("th[data-sort-table][data-sort-key]"));
 const pageSections = {
   dashboard: document.getElementById("dashboard-page"),
   archive: document.getElementById("archive-page")
@@ -333,8 +338,87 @@ function filteredActivePositions() {
   return active.filter((entry) => entry.type === activeTab);
 }
 
+function getSortValue(entry, key) {
+  switch (key) {
+    case "date": {
+      const parsedDate = parsePositionDate(entry.date);
+      return parsedDate ? parsedDate.getTime() : 0;
+    }
+    case "wallet":
+    case "chain":
+    case "projectName":
+    case "strategyName":
+    case "notes":
+      return String(entry[key] || "");
+    case "investedAmount":
+    case "currentValue":
+      return Number(entry[key] || 0);
+    case "roiPercent":
+      return computeRoiPercent(entry);
+    case "monthlyCashflow":
+      return computeMonthlyCashflow(entry);
+    case "apyAnnual":
+      return computeApyAnnual(entry);
+    case "archivedAt": {
+      const archivedDate = entry.archivedAt ? new Date(entry.archivedAt) : null;
+      return archivedDate && !Number.isNaN(archivedDate.getTime()) ? archivedDate.getTime() : 0;
+    }
+    default:
+      return String(entry[key] || "");
+  }
+}
+
+function sortRows(rows, tableName) {
+  const state = sortState[tableName];
+  if (!state?.key) {
+    return rows;
+  }
+
+  const factor = state.direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const aValue = getSortValue(a, state.key);
+    const bValue = getSortValue(b, state.key);
+    let result = 0;
+
+    if (typeof aValue === "number" && typeof bValue === "number") {
+      result = aValue - bValue;
+    } else {
+      result = String(aValue).localeCompare(String(bValue), undefined, { sensitivity: "base", numeric: true });
+    }
+
+    if (result !== 0) {
+      return result * factor;
+    }
+    return String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function updateSortUi() {
+  sortableHeaders.forEach((header) => {
+    const tableName = header.dataset.sortTable;
+    const key = header.dataset.sortKey;
+    const indicator = header.querySelector(".sort-indicator");
+    const state = tableName ? sortState[tableName] : null;
+    const isActive = Boolean(state && key && state.key === key);
+
+    if (!isActive) {
+      header.setAttribute("aria-sort", "none");
+      if (indicator) {
+        indicator.textContent = "";
+      }
+      return;
+    }
+
+    const isAscending = state.direction === "asc";
+    header.setAttribute("aria-sort", isAscending ? "ascending" : "descending");
+    if (indicator) {
+      indicator.textContent = isAscending ? "▲" : "▼";
+    }
+  });
+}
+
 function renderActiveTable() {
-  const rows = filteredActivePositions();
+  const rows = sortRows(filteredActivePositions(), "active");
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
@@ -374,7 +458,7 @@ function renderActiveTable() {
 }
 
 function renderArchivedTable() {
-  const rows = archivedPositions();
+  const rows = sortRows(archivedPositions(), "archive");
 
   if (rows.length === 0) {
     archivedBody.innerHTML = `
@@ -479,6 +563,36 @@ tabs.forEach((tab) => {
 pageTabs.forEach((tab) => {
   tab.addEventListener("click", () => {
     setPage(tab.dataset.pageTarget);
+  });
+});
+
+sortableHeaders.forEach((header) => {
+  const button = header.querySelector(".sort-btn");
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", () => {
+    const tableName = button.dataset.sortTable;
+    const key = button.dataset.sortKey;
+    if (!tableName || !key || !sortState[tableName]) {
+      return;
+    }
+
+    const state = sortState[tableName];
+    if (state.key === key) {
+      state.direction = state.direction === "asc" ? "desc" : "asc";
+    } else {
+      state.key = key;
+      state.direction = "asc";
+    }
+
+    updateSortUi();
+    if (tableName === "active") {
+      renderActiveTable();
+    } else {
+      renderArchivedTable();
+    }
   });
 });
 
@@ -635,4 +749,5 @@ loadPositions();
 setPage(activePage);
 resetFormMode();
 render();
+updateSortUi();
 console.log("DEF-31 required column + editability update loaded");

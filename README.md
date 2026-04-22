@@ -44,6 +44,7 @@ Open: `http://localhost:4173`
 ## Verification notes
 
 - Verified table tab filters: `All`, `Lending`, `Pendle PT`, `Strategies`.
+- Verified sortable columns in active and archive tables (all data columns with asc/desc toggle).
 - Verified KPI summary recomputes on add/delete actions.
 - Verified migration behavior: app can load legacy array payloads and new versioned payloads without dropping positions.
 
