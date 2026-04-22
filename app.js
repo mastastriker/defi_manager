@@ -1031,7 +1031,10 @@ function setActiveTab(nextTab) {
     tab.classList.toggle("active", isActive);
     tab.setAttribute("aria-selected", isActive ? "true" : "false");
   });
-  if (!editingPositionId) {
+  if (editingPositionId) {
+    resetFormMode();
+    setStatus("Bearbeitungsmodus wegen Reiterwechsel beendet.");
+  } else {
     syncTypeSpecificFields(nextTab);
   }
   if (nextTab === "pendle" && sortState.active.key === "notes") {
