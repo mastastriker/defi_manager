@@ -122,6 +122,7 @@ const kpiApy = document.getElementById("kpi-apy");
 const kpiCashflow = document.getElementById("kpi-cashflow");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
+const activeMaturityHeader = document.getElementById("active-maturity-header");
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("de-DE", {
@@ -430,6 +431,24 @@ function updatePositionCountLabel() {
   activePositionsTotal.textContent = `(${filteredActivePositions().length})`;
 }
 
+function isMaturityColumnVisible() {
+  return activeTab === "pendle";
+}
+
+function updateActiveTableColumns() {
+  const showMaturity = isMaturityColumnVisible();
+  if (!activeMaturityHeader) {
+    return;
+  }
+
+  activeMaturityHeader.hidden = !showMaturity;
+  const maturityButton = activeMaturityHeader.querySelector(".sort-btn");
+  if (maturityButton instanceof HTMLButtonElement) {
+    maturityButton.disabled = !showMaturity;
+    maturityButton.setAttribute("aria-hidden", showMaturity ? "false" : "true");
+  }
+}
+
 function syncMaturityField(positionType) {
   const isPendle = positionType === "pendle";
   if (maturityField) {
@@ -572,11 +591,13 @@ function updateSortUi() {
 function renderActiveTable() {
   const rows = sortRows(filteredActivePositions(), "active");
   const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
+  const showMaturity = isMaturityColumnVisible();
+  const tableColspan = showMaturity ? 14 : 13;
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="14" class="empty">In ${activeTabLabel} sind noch keine aktiven Positionen vorhanden.</td>
+        <td colspan="${tableColspan}" class="empty">In ${activeTabLabel} sind noch keine aktiven Positionen vorhanden.</td>
       </tr>
     `;
     return;
@@ -597,7 +618,7 @@ function renderActiveTable() {
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
-        <td>${formatDate(row.maturityDate)}</td>
+        ${showMaturity ? `<td>${formatDate(row.maturityDate)}</td>` : ""}
         <td>${escapeHtml(row.notes || "-")}</td>
         <td>
           <div class="row-actions">
@@ -618,7 +639,7 @@ function renderArchivedTable() {
   if (rows.length === 0) {
     archivedBody.innerHTML = `
       <tr>
-        <td colspan="15" class="empty">Noch keine archivierten Positionen.</td>
+        <td colspan="14" class="empty">Noch keine archivierten Positionen.</td>
       </tr>
     `;
     return;
@@ -639,7 +660,6 @@ function renderArchivedTable() {
         <td>${roiDisplay(row)}</td>
         <td>${formatCurrency(computeMonthlyCashflow(row))}</td>
         <td>${formatPercent(computeApyAnnual(row))}</td>
-        <td>${formatDate(row.maturityDate)}</td>
         <td>${escapeHtml(row.notes || "-")}</td>
         <td>${formatArchiveTimestamp(row.archivedAt)}</td>
         <td>
@@ -673,6 +693,11 @@ function setActiveTab(nextTab) {
   if (!editingPositionId) {
     syncMaturityField(nextTab);
   }
+  if (nextTab !== "pendle" && sortState.active.key === "maturityDate") {
+    sortState.active.key = null;
+  }
+  updateActiveTableColumns();
+  updateSortUi();
   renderActiveTable();
 }
 
@@ -1127,5 +1152,6 @@ loadPositions();
 setPage(activePage);
 resetFormMode();
 render();
+updateActiveTableColumns();
 updateSortUi();
 console.log("DEF-66 wallet rename update loaded");
