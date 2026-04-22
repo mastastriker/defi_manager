@@ -15,7 +15,8 @@ const TYPE_LABELS = {
 
 const VALID_TYPES = new Set(["lending", "pendle", "strategy"]);
 const VALID_STATUSES = new Set(["active", "archived"]);
-const SUPPORTED_CHAINS = new Set(["ETH", "BASE", "ARB", "AVAX"]);
+const CHAIN_ORDER = ["ETH", "ARB", "BASE", "AVAX"];
+const SUPPORTED_CHAINS = new Set(CHAIN_ORDER);
 const DEFAULT_CHAIN = "ETH";
 
 const initialPositions = [
@@ -453,7 +454,11 @@ function getSortValue(entry, key) {
       return parsedDate ? parsedDate.getTime() : 0;
     }
     case "wallet":
-    case "chain":
+    case "chain": {
+      const normalizedChain = String(entry.chain || "").toUpperCase();
+      const chainOrderIndex = CHAIN_ORDER.indexOf(normalizedChain);
+      return chainOrderIndex >= 0 ? chainOrderIndex : Number.MAX_SAFE_INTEGER;
+    }
     case "projectName":
     case "strategyName":
     case "notes":
