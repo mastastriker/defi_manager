@@ -22,10 +22,8 @@ body {
 }
 
 .shell {
-  width: 100%;
-  max-width: 1050px;
+  width: min(1050px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 0 1rem;
 }
 
 .bg-glow {
@@ -88,6 +86,8 @@ main {
   display: grid;
   gap: 0.9rem;
   padding-bottom: 2rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .top-nav {
@@ -115,6 +115,7 @@ main {
 .page-section {
   display: grid;
   gap: 0.9rem;
+  min-width: 0;
 }
 
 .page-section[hidden] {
@@ -127,6 +128,7 @@ main {
   padding: 1rem;
   background: linear-gradient(180deg, var(--surface-soft), var(--surface));
   backdrop-filter: blur(6px);
+  min-width: 0;
 }
 
 .panel h2 {
@@ -235,6 +237,7 @@ select {
 
 .table-wrap {
   overflow-x: auto;
+  max-width: 100%;
 }
 
 .wallet-form {
