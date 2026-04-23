@@ -27,10 +27,10 @@ Open: `http://localhost:4173`
 
 ## Manual-entry and persistence flow
 
-1. Use the `Manual Position Entry` form to add a position.
+1. Use the `Manual Position Entry` form to add a position (date/time with hour precision).
 2. Wallets are selected from the managed wallet dropdown (`Cash1` and `Cash2` defaults).
-3. Enter `Zinsen (USD)` when available.
-4. `Aktueller Wert` is automatically calculated as `Eingezahlt + Zinsen`.
+3. Enter exactly one value: either `Zinsen (USD)` or `Aktueller Wert (USD)`.
+4. The other value is calculated automatically (`Aktueller Wert = Eingezahlt + Zinsen` / `Zinsen = Aktueller Wert - Eingezahlt`).
 5. Position appears in the table and KPI totals update immediately.
 6. Reload the page.
 7. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
@@ -58,6 +58,9 @@ Open: `http://localhost:4173`
 - Verified table tab filters: `All`, `Lending`, `Pendle PT`, `Strategies`.
 - Verified sortable columns in active and archive tables (all data columns with asc/desc toggle).
 - Verified KPI summary recomputes on add/delete actions.
+- Verified KPI `Durchschnittliches APY` is calculated with `((1 + monatlicher Cashflow / aktueller Gesamtwert)^12 - 1)`.
+- Verified APY per position is derived from observed monthly cashflow and compounded to 12 months (`(1 + Monatsrate)^12 - 1`).
+- Verified date/time (`datetime-local`, hourly) is shown and stored in hour precision and APY/cashflow annualization uses elapsed hours.
 - Verified migration behavior: app can load legacy array payloads and new versioned payloads without dropping positions.
 
 ## Vercel deployment notes (GitHub auto deploy)
