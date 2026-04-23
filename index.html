@@ -104,7 +104,7 @@
             </label>
             <label id="position-current-field">
               <span id="position-current-label">Aktueller Wert (USD)</span>
-              <input id="position-current" type="number" min="0" step="0.01" placeholder="102500" />
+              <input id="position-current" type="number" min="0" step="0.00000001" placeholder="102500" />
             </label>
             <label id="position-debt-field">
               Borrow Schulden (nur Lending/Borrow)
@@ -214,21 +214,27 @@
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
+                  <th id="active-collateral-apy-header" data-sort-table="active" data-sort-key="collateralApy" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="collateralApy">
+                      Collateral APY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
                   <th id="active-net-apy-header" data-sort-table="active" data-sort-key="netApy" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="netApy">
                       NetAPY
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
-                  <th id="active-borrow-cost-header" data-sort-table="active" data-sort-key="borrowCost" aria-sort="none">
-                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowCost">
-                      Borrow Cost
-                      <span class="sort-indicator" aria-hidden="true"></span>
-                    </button>
-                  </th>
                   <th id="active-borrow-apy-header" data-sort-table="active" data-sort-key="borrowApy" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowApy">
                       Borrow APY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-cost-header" data-sort-table="active" data-sort-key="borrowCost" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowCost">
+                      Borrow Cost
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>

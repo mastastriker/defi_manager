@@ -153,6 +153,7 @@ const activeInterestHeader = document.getElementById("active-interest-header");
 const activeRoiHeader = document.getElementById("active-roi-header");
 const activeMonthlyCashflowHeader = document.getElementById("active-monthly-cashflow-header");
 const activeApyHeader = document.getElementById("active-apy-header");
+const activeCollateralApyHeader = document.getElementById("active-collateral-apy-header");
 const activeNetApyHeader = document.getElementById("active-net-apy-header");
 const activeBorrowCostHeader = document.getElementById("active-borrow-cost-header");
 const activeBorrowApyHeader = document.getElementById("active-borrow-apy-header");
@@ -730,6 +731,7 @@ function updateActiveTableColumns() {
   toggleHeaderVisibility(activeMonthlyCashflowHeader, showClassic || showMaturity);
   toggleHeaderVisibility(activeFixedCashflowHeader, showMaturity);
   toggleHeaderVisibility(activeApyHeader, showClassic || showMaturity);
+  toggleHeaderVisibility(activeCollateralApyHeader, showLending);
   toggleHeaderVisibility(activeNetApyHeader, showLending);
   toggleHeaderVisibility(activeBorrowCostHeader, showLending);
   toggleHeaderVisibility(activeBorrowApyHeader, showLending);
@@ -893,6 +895,8 @@ function getSortValue(entry, key) {
       return computeFixedMonthlyCashflow(entry);
     case "apyAnnual":
       return computeApyAnnual(entry);
+    case "collateralApy":
+      return computeApyAnnual(entry);
     case "netApy":
       return computeNetApy(entry);
     case "borrowCost":
@@ -968,7 +972,7 @@ function renderActiveTable() {
   const activeTabLabel = TYPE_LABELS[activeTab] || "diesen Bereich";
   const showMaturity = isMaturityColumnVisible();
   const showLending = isLendingColumnVisible();
-  const tableColspan = showMaturity ? 16 : showLending ? 14 : 13;
+  const tableColspan = showMaturity ? 16 : showLending ? 15 : 13;
 
   if (rows.length === 0) {
     tableBody.innerHTML = `
@@ -995,9 +999,10 @@ function renderActiveTable() {
         ${showLending ? "" : `<td>${formatCurrency(computeMonthlyCashflow(row))}</td>`}
         ${showMaturity ? `<td>${formatCurrency(computeFixedMonthlyCashflow(row))}</td>` : ""}
         ${showLending ? "" : `<td>${formatPercent(computeApyAnnual(row))}</td>`}
+        ${showLending ? `<td>${formatPercent(computeApyAnnual(row))}</td>` : ""}
         ${showLending ? `<td>${formatPercent(computeNetApy(row))}</td>` : ""}
-        ${showLending ? `<td>${formatCurrency(computeBorrowCost(row))}</td>` : ""}
         ${showLending ? `<td>${formatPercent(computeBorrowApy(row))}</td>` : ""}
+        ${showLending ? `<td>${formatCurrency(computeBorrowCost(row))}</td>` : ""}
         ${showLending ? `<td>${formatCurrency(Number(row.debtUsd || 0))}</td>` : ""}
         ${showLending ? `<td>${formatCurrency(Number(row.borrowPayout || 0))}</td>` : ""}
         ${showLending ? `<td>${formatPercent(computeLtv(row))}</td>` : ""}
@@ -1096,6 +1101,7 @@ function setActiveTab(nextTab) {
   if (
     nextTab !== "lending" &&
     (sortState.active.key === "collateral" ||
+      sortState.active.key === "collateralApy" ||
       sortState.active.key === "netApy" ||
       sortState.active.key === "borrowCost" ||
       sortState.active.key === "borrowApy" ||
