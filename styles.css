@@ -67,6 +67,8 @@ h1 {
   margin: 0.7rem 0 0;
   font-size: clamp(2rem, 7vw, 3.2rem);
   line-height: 1.05;
+  text-decoration: underline;
+  text-underline-offset: 0.22em;
 }
 
 .subtitle {
