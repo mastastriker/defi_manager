@@ -123,10 +123,13 @@ const investedField = document.getElementById("position-invested-field");
 const investedLabel = document.getElementById("position-invested-label");
 const investedInput = document.getElementById("position-invested");
 const interestField = document.getElementById("position-interest-field");
+const interestLabel = document.getElementById("position-interest-label");
 const interestInput = document.getElementById("position-interest");
 const currentField = document.getElementById("position-current-field");
 const currentLabel = document.getElementById("position-current-label");
 const currentInput = document.getElementById("position-current");
+const debtLabel = document.getElementById("position-debt-label");
+const borrowPayoutLabel = document.getElementById("position-borrow-payout-label");
 const notesField = document.getElementById("position-notes-field");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
@@ -303,6 +306,15 @@ function updateAmountLabels(positionType = activeTab) {
   }
   if (currentLabel) {
     currentLabel.textContent = `Aktueller Wert (${unit})`;
+  }
+  if (interestLabel) {
+    interestLabel.textContent = `Zinsen (${positionType === "strategy" ? unit : "USD"})`;
+  }
+  if (debtLabel) {
+    debtLabel.textContent = "Borrow Schulden (USD, nur Lending/Borrow)";
+  }
+  if (borrowPayoutLabel) {
+    borrowPayoutLabel.textContent = "Borrow Ausgezahlt (USD, nur Lending/Borrow)";
   }
 }
 
@@ -1212,6 +1224,7 @@ function resetFormMode() {
   syncTypeSpecificFields(activeTab);
   if (activeTab === "strategy" && currencyInput) {
     currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
+    updateAmountLabels("strategy");
   }
   syncCalculationInputs();
   setFormMode(false);

@@ -75,7 +75,7 @@
               <select id="position-wallet" required></select>
             </label>
             <label>
-              Chains
+              Chain
               <select id="position-chain" required>
                 <option value="ETH">ETH</option>
                 <option value="ARB">ARB</option>
@@ -102,7 +102,7 @@
               </select>
             </label>
             <label id="position-maturity-field">
-              Maturity (nur PT)
+              Fälligkeit (nur PT)
               <input id="position-maturity" type="datetime-local" step="3600" />
             </label>
             <label id="position-pt-amount-field">
@@ -124,7 +124,7 @@
               <input id="position-invested" type="number" min="0" step="0.00000001" placeholder="100000" required />
             </label>
             <label id="position-interest-field">
-              Zinsen (USD)
+              <span id="position-interest-label">Zinsen (USD)</span>
               <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
             </label>
             <label id="position-current-field">
@@ -132,11 +132,11 @@
               <input id="position-current" type="number" min="0" step="0.00000001" placeholder="102500" />
             </label>
             <label id="position-debt-field">
-              Borrow Schulden (nur Lending/Borrow)
+              <span id="position-debt-label">Borrow Schulden (USD, nur Lending/Borrow)</span>
               <input id="position-debt" type="number" min="0" step="0.01" placeholder="25000" />
             </label>
             <label id="position-borrow-payout-field">
-              Borrow Ausgezahlt (nur Lending/Borrow)
+              <span id="position-borrow-payout-label">Borrow Ausgezahlt (USD, nur Lending/Borrow)</span>
               <input id="position-borrow-payout" type="number" min="0" step="0.01" placeholder="24800" />
             </label>
             <label id="position-notes-field" class="span-full">
