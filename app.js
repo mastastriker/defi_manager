@@ -1210,6 +1210,9 @@ function resetFormMode() {
   chainInput.value = DEFAULT_CHAIN;
   dateInput.value = localDateTimeNowHour();
   syncTypeSpecificFields(activeTab);
+  if (activeTab === "strategy" && currencyInput) {
+    currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
+  }
   syncCalculationInputs();
   setFormMode(false);
 }
