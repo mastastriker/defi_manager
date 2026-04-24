@@ -23,6 +23,7 @@ const VALID_STATUSES = new Set(["active", "archived"]);
 const CHAIN_ORDER = ["ETH", "ARB", "BASE", "AVAX"];
 const SUPPORTED_CHAINS = new Set(CHAIN_ORDER);
 const DEFAULT_CHAIN = "ETH";
+const DEFAULT_STRATEGY_CURRENCY = "USDC";
 const MS_PER_HOUR = 1000 * 60 * 60;
 const HOURS_PER_YEAR = 365.25 * 24;
 const HOURS_PER_MONTH = HOURS_PER_YEAR / 12;
@@ -376,7 +377,9 @@ function normalizePosition(entry) {
     ? entry.currency.trim()
     : safeType === "strategy" && typeof entry?.strategyName === "string" && entry.strategyName.trim()
       ? entry.strategyName.trim()
-      : "USD";
+      : safeType === "strategy"
+        ? DEFAULT_STRATEGY_CURRENCY
+        : "USD";
   const normalizedStrategyName = typeof entry?.strategyName === "string" && entry.strategyName.trim()
     ? entry.strategyName.trim()
     : typeof entry?.name === "string" && entry.name.trim()
@@ -855,7 +858,10 @@ function syncTypeSpecificFields(positionType) {
     }
   }
   if (!isStrategy && currencyInput) {
-    currencyInput.value = "ETH";
+    currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
+  }
+  if (isStrategy && currencyInput && !currencyInput.value) {
+    currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
   }
   if (!isStrategy && notesInput) {
     notesInput.value = "";
@@ -1507,7 +1513,7 @@ tableBody.addEventListener("click", (event) => {
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
     if (currencyInput) {
-      currencyInput.value = position.currency || position.strategyName || "ETH";
+      currencyInput.value = position.currency || position.strategyName || DEFAULT_STRATEGY_CURRENCY;
     }
     ptAmountInput.value = position.ptAmount === null || position.ptAmount === undefined ? "" : String(position.ptAmount);
     maturityInput.value = normalizeDateTimeValue(position.maturityDate || "") || "";
