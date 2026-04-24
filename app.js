@@ -3,6 +3,7 @@ const STORAGE_KEYS = {
   legacy: "defi-dashboard-positions-v1",
   backup: "defi-dashboard-positions-backup-v1"
 };
+const APP_VERSION = "V1.1";
 const WALLET_STORAGE_KEY = "defi-dashboard-wallets-v1";
 const STORAGE_VERSION = 2;
 const DEFAULT_WALLETS = ["Cash1", "Cash2"];
@@ -144,6 +145,7 @@ const walletNameInput = document.getElementById("wallet-name");
 const walletList = document.getElementById("wallet-list");
 const walletStatus = document.getElementById("wallet-status");
 const walletCount = document.getElementById("wallet-count");
+const versionInfo = document.getElementById("version-info");
 
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
@@ -170,6 +172,13 @@ const activeFixedCashflowHeader = document.getElementById("active-fixed-cashflow
 const activeMaturityHeader = document.getElementById("active-maturity-header");
 const activeRoiMaturityHeader = document.getElementById("active-roi-maturity-header");
 const activeNotesHeader = document.getElementById("active-notes-header");
+
+function renderVersionInfo() {
+  if (!versionInfo) {
+    return;
+  }
+  versionInfo.textContent = `Release ${APP_VERSION} | Storage v${STORAGE_VERSION}`;
+}
 
 function formatCurrency(value) {
   return new Intl.NumberFormat("de-DE", {
@@ -1701,6 +1710,7 @@ walletList?.addEventListener("click", (event) => {
 
 loadWallets();
 loadPositions();
+renderVersionInfo();
 setPage(activePage);
 resetFormMode();
 render();

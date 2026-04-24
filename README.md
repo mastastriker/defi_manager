@@ -62,6 +62,7 @@ Open: `http://localhost:4173`
 - Verified APY per position is derived from observed monthly cashflow and compounded to 12 months (`(1 + Monatsrate)^12 - 1`).
 - Verified date/time (`datetime-local`, hourly) is shown and stored in hour precision and APY/cashflow annualization uses elapsed hours.
 - Verified migration behavior: app can load legacy array payloads and new versioned payloads without dropping positions.
+- Verified header version badge shows release version (`V1.1`) and storage schema (`v2`).
 
 ## Vercel deployment notes (GitHub auto deploy)
 
