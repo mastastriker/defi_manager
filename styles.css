@@ -84,18 +84,6 @@ h1 {
   font-size: 0.92rem;
 }
 
-.version-info {
-  margin: 0.7rem 0 0;
-  width: fit-content;
-  border: 1px solid rgba(53, 200, 255, 0.35);
-  border-radius: 999px;
-  background: rgba(16, 45, 70, 0.48);
-  color: #d7ecff;
-  font-size: 0.8rem;
-  letter-spacing: 0.02em;
-  padding: 0.3rem 0.58rem;
-}
-
 main {
   display: grid;
   gap: 0.9rem;
