@@ -74,6 +74,7 @@ const initialPositions = [
     wallet: "Cash1",
     chain: "BASE",
     projectName: "Morpho",
+    currency: "USDC",
     strategyName: "Stablecoin Basis Loop",
     investedAmount: 220000,
     interestAmount: 9500,
@@ -103,7 +104,10 @@ const walletInput = document.getElementById("position-wallet");
 const chainInput = document.getElementById("position-chain");
 const projectInput = document.getElementById("position-project");
 const strategyNameField = document.getElementById("position-strategy-name-field");
+const strategyNameLabel = document.getElementById("position-strategy-name-label");
 const strategyNameInput = document.getElementById("position-strategy-name");
+const currencyField = document.getElementById("position-currency-field");
+const currencyInput = document.getElementById("position-currency");
 const maturityField = document.getElementById("position-maturity-field");
 const maturityInput = document.getElementById("position-maturity");
 const ptAmountField = document.getElementById("position-pt-amount-field");
@@ -147,6 +151,7 @@ const kpiCashflow = document.getElementById("kpi-cashflow");
 const kpiLendingCost = document.getElementById("kpi-lending-cost");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
+const activeStrategyColumnLabel = document.getElementById("active-strategy-column-label");
 const activeStrategyNameHeader = document.getElementById("active-strategy-name-header");
 const activeCollateralHeader = document.getElementById("active-collateral-header");
 const activeInterestHeader = document.getElementById("active-interest-header");
@@ -274,8 +279,24 @@ function currentCollateralUnit() {
   return cleaned || "USD";
 }
 
-function updateLendingAmountLabels() {
-  const unit = currentCollateralUnit();
+function currentStrategyCurrencyUnit() {
+  const raw = currencyInput?.value || "";
+  const cleaned = raw.trim();
+  return cleaned || "USD";
+}
+
+function currentAmountUnitForType(positionType) {
+  if (positionType === "lending") {
+    return currentCollateralUnit();
+  }
+  if (positionType === "strategy") {
+    return currentStrategyCurrencyUnit();
+  }
+  return "USD";
+}
+
+function updateAmountLabels(positionType = activeTab) {
+  const unit = currentAmountUnitForType(positionType);
   if (investedLabel) {
     investedLabel.textContent = `Eingezahlter Betrag (${unit})`;
   }
@@ -351,6 +372,16 @@ function normalizePosition(entry) {
     : Number.isFinite(Number(entry?.borrowPaidOut))
       ? Math.max(0, Number(entry.borrowPaidOut))
       : 0;
+  const normalizedCurrency = typeof entry?.currency === "string" && entry.currency.trim()
+    ? entry.currency.trim()
+    : safeType === "strategy" && typeof entry?.strategyName === "string" && entry.strategyName.trim()
+      ? entry.strategyName.trim()
+      : "USD";
+  const normalizedStrategyName = typeof entry?.strategyName === "string" && entry.strategyName.trim()
+    ? entry.strategyName.trim()
+    : typeof entry?.name === "string" && entry.name.trim()
+      ? entry.name.trim()
+      : "Unbenannte Position";
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -365,12 +396,8 @@ function normalizePosition(entry) {
         ? entry.chain.trim().toUpperCase()
         : DEFAULT_CHAIN,
     projectName: typeof entry?.projectName === "string" && entry.projectName.trim() ? entry.projectName.trim() : TYPE_LABELS[safeType],
-    strategyName:
-      typeof entry?.strategyName === "string" && entry.strategyName.trim()
-        ? entry.strategyName.trim()
-        : typeof entry?.name === "string" && entry.name.trim()
-          ? entry.name.trim()
-          : "Unbenannte Position",
+    currency: normalizedCurrency,
+    strategyName: safeType === "strategy" ? normalizedCurrency : normalizedStrategyName,
     investedAmount: normalizedInvested,
     interestAmount: computedInterest,
     currentValue: computedCurrent,
@@ -699,6 +726,13 @@ function updatePositionCountLabel() {
   activePositionsTotal.textContent = `(${filteredActivePositions().length})`;
 }
 
+function updateStrategyColumnLabel() {
+  if (!activeStrategyColumnLabel) {
+    return;
+  }
+  activeStrategyColumnLabel.textContent = activeTab === "strategy" ? "Währung" : "Name der Strategie";
+}
+
 function isMaturityColumnVisible() {
   return activeTab === "pendle";
 }
@@ -749,10 +783,19 @@ function syncTypeSpecificFields(positionType) {
   const isLending = positionType === "lending";
   const isStrategy = positionType === "strategy";
   if (strategyNameField) {
-    strategyNameField.hidden = isLending;
+    strategyNameField.hidden = !isPendle;
+  }
+  if (strategyNameLabel) {
+    strategyNameLabel.textContent = "Name der Strategie";
   }
   if (strategyNameInput) {
-    strategyNameInput.required = !isLending;
+    strategyNameInput.required = isPendle;
+  }
+  if (currencyField) {
+    currencyField.hidden = !isStrategy;
+  }
+  if (currencyInput) {
+    currencyInput.required = isStrategy;
   }
   if (maturityField) {
     maturityField.hidden = !isPendle;
@@ -811,10 +854,13 @@ function syncTypeSpecificFields(positionType) {
       strategyNameInput.value = "";
     }
   }
+  if (!isStrategy && currencyInput) {
+    currencyInput.value = "ETH";
+  }
   if (!isStrategy && notesInput) {
     notesInput.value = "";
   }
-  updateLendingAmountLabels();
+  updateAmountLabels(positionType);
 }
 
 function renderWalletSelect() {
@@ -871,10 +917,11 @@ function getSortValue(entry, key) {
       return chainOrderIndex >= 0 ? chainOrderIndex : Number.MAX_SAFE_INTEGER;
     }
     case "projectName":
-    case "strategyName":
     case "collateral":
     case "notes":
       return String(entry[key] || "");
+    case "strategyName":
+      return entry.type === "strategy" ? String(entry.currency || entry.strategyName || "") : String(entry.strategyName || "");
     case "maturityDate": {
       const maturityDate = parsePositionDate(entry.maturityDate);
       return maturityDate ? maturityDate.getTime() : 0;
@@ -991,7 +1038,7 @@ function renderActiveTable() {
         <td>${escapeHtml(row.wallet)}</td>
         <td>${escapeHtml(row.chain)}</td>
         <td>${escapeHtml(row.projectName)}</td>
-        ${showLending ? `<td>${escapeHtml(row.collateral || "-")}</td>` : `<td>${escapeHtml(row.strategyName)}</td>`}
+        ${showLending ? `<td>${escapeHtml(row.collateral || "-")}</td>` : `<td>${escapeHtml(row.type === "strategy" ? row.currency || row.strategyName : row.strategyName)}</td>`}
         <td>${showLending ? formatAssetAmount(Number(row.investedAmount || 0), row.collateral) : formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${showLending ? formatAssetAmount(Number(row.currentValue || 0), row.collateral) : formatCurrency(Number(row.currentValue || 0))}</td>
         ${showLending ? "" : `<td>${formatCurrency(Number(row.interestAmount || 0))}</td>`}
@@ -1043,7 +1090,7 @@ function renderArchivedTable() {
         <td>${escapeHtml(row.wallet)}</td>
         <td>${escapeHtml(row.chain)}</td>
         <td>${escapeHtml(row.projectName)}</td>
-        <td>${escapeHtml(row.strategyName)}</td>
+        <td>${escapeHtml(row.type === "strategy" ? row.currency || row.strategyName : row.strategyName)}</td>
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
         <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
@@ -1112,6 +1159,7 @@ function setActiveTab(nextTab) {
     sortState.active.key = null;
   }
   updateActiveTableColumns();
+  updateStrategyColumnLabel();
   updatePositionCountLabel();
   updateSortUi();
   renderActiveTable();
@@ -1220,7 +1268,15 @@ currentInput.addEventListener("input", () => {
 });
 
 collateralInput?.addEventListener("change", () => {
-  updateLendingAmountLabels();
+  if (activeTab === "lending") {
+    updateAmountLabels("lending");
+  }
+});
+
+currencyInput?.addEventListener("change", () => {
+  if (activeTab === "strategy") {
+    updateAmountLabels("strategy");
+  }
 });
 
 sortableHeaders.forEach((header) => {
@@ -1265,6 +1321,7 @@ form.addEventListener("submit", (event) => {
     chain: chainInput.value,
     projectName: projectInput.value.trim(),
     strategyName: strategyNameInput.value.trim(),
+    currency: "",
     investedAmount: Number(investedInput.value),
     interestAmount: 0,
     currentValue: 0,
@@ -1326,9 +1383,16 @@ form.addEventListener("submit", (event) => {
       }
       next.borrowPayout = borrowPayout;
     }
+  } else if (next.type === "strategy") {
+    next.currency = currencyInput?.value.trim() || "";
+    next.strategyName = next.currency;
+    if (!next.currency) {
+      setStatus("Waehrung ist fuer klassische Yield Strategien erforderlich.");
+      return;
+    }
   }
 
-  if (next.type !== "lending" && !next.strategyName) {
+  if (next.type === "pendle" && !next.strategyName) {
     setStatus("Name der Strategie ist erforderlich.");
     return;
   }
@@ -1442,6 +1506,9 @@ tableBody.addEventListener("click", (event) => {
     chainInput.value = position.chain;
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
+    if (currencyInput) {
+      currencyInput.value = position.currency || position.strategyName || "ETH";
+    }
     ptAmountInput.value = position.ptAmount === null || position.ptAmount === undefined ? "" : String(position.ptAmount);
     maturityInput.value = normalizeDateTimeValue(position.maturityDate || "") || "";
     if (collateralInput) {
@@ -1466,7 +1533,11 @@ tableBody.addEventListener("click", (event) => {
     syncCalculationInputs();
     setFormMode(true);
     setStatus("Position wird bearbeitet.");
-    strategyNameInput.focus();
+    if (position.type === "strategy" && currencyInput) {
+      currencyInput.focus();
+    } else {
+      strategyNameInput.focus();
+    }
     return;
   }
 
@@ -1634,5 +1705,6 @@ setPage(activePage);
 resetFormMode();
 render();
 updateActiveTableColumns();
+updateStrategyColumnLabel();
 updateSortUi();
 console.log("DEF-66 wallet rename update loaded");

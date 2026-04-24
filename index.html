@@ -73,8 +73,18 @@
               <input id="position-project" type="text" maxlength="48" placeholder="Pendle" />
             </label>
             <label id="position-strategy-name-field">
-              Name der Strategie
+              <span id="position-strategy-name-label">Name der Strategie</span>
               <input id="position-strategy-name" type="text" maxlength="80" placeholder="PT-ETH Dec 2026" required />
+            </label>
+            <label id="position-currency-field">
+              Währung
+              <select id="position-currency">
+                <option value="ETH">ETH</option>
+                <option value="BTC">BTC</option>
+                <option value="stETH">stETH</option>
+                <option value="USDC">USDC</option>
+                <option value="DAI">DAI</option>
+              </select>
             </label>
             <label id="position-maturity-field">
               Maturity (nur PT)
@@ -162,7 +172,7 @@
                   </th>
                   <th id="active-strategy-name-header" data-sort-table="active" data-sort-key="strategyName" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="strategyName">
-                      Name der Strategie
+                      <span id="active-strategy-column-label">Name der Strategie</span>
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
