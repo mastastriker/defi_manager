@@ -79,6 +79,10 @@ Open: `http://localhost:4173`
 - PR-Checkliste: `.github/pull_request_template.md`
 - Automatische Branch-Gate-Pruefung: `.github/workflows/branch-strategy-gate.yml`
 
+## Operational notes
+
+- DEF-101 (2026-04-24): validated required development-branch commit/push workflow on `codex/v1.1`.
+
 ## Deferred for later scope
 
 - Wallet connection and protocol API integration
