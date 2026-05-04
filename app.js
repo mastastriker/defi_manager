@@ -673,8 +673,20 @@ async function loadStateFromSupabase() {
     }
 
     const remote = normalizeRemoteState(data?.payload);
+    const local = getLocalStateSnapshot();
+    const localUpdatedAtMs = Date.parse(local.updatedAt || "") || 0;
+    const remoteUpdatedAtMs = Date.parse(data?.updated_at || remote?.updatedAt || "") || 0;
+    const hasLocalData = Array.isArray(local.positions) && local.positions.length > 0 && Array.isArray(local.wallets) && local.wallets.length > 0;
+
     if (!remote) {
-      await saveStateToSupabase("initial");
+      await saveStateToSupabase("initial upload");
+      setSupabaseStatus("Lokale Daten in Supabase hochgeladen.");
+      return;
+    }
+
+    if (hasLocalData && localUpdatedAtMs > remoteUpdatedAtMs) {
+      await saveStateToSupabase("local overwrite");
+      setSupabaseStatus("Neuere lokale Daten nach Supabase kopiert.");
       return;
     }
 
