@@ -96,8 +96,8 @@ let editingPositionId = null;
 let activePage = "dashboard";
 let supabaseClient = null;
 let supabaseConfigSource = "none";
-const SUPABASE_STATE_TABLE = "defi_manager_state";
-const SUPABASE_STATE_ID = "global";
+const SUPABASE_WALLETS_TABLE = "wallets";
+const SUPABASE_POSITIONS_TABLE = "positions";
 let suppressRemoteSync = false;
 let manualSupabaseConfig = null;
 let supabaseSyncQueue = Promise.resolve();
@@ -613,57 +613,38 @@ async function validateSupabaseSchema() {
 
   setSupabaseStatus("Prüfe DEF-108 Datenbankstruktur...");
   try {
-    const { data, error } = await supabaseClient
-      .from(SUPABASE_STATE_TABLE)
-      .select("id,payload,schema_version,created_at,updated_at")
-      .eq("id", SUPABASE_STATE_ID)
-      .maybeSingle();
-
-    if (error) {
-      throw error;
+    const walletsProbe = await supabaseClient
+      .from(SUPABASE_WALLETS_TABLE)
+      .select("id,user_id,name,created_at")
+      .limit(1);
+    if (walletsProbe.error) {
+      throw walletsProbe.error;
     }
 
-    const hasPayload = Boolean(data?.payload && typeof data.payload === "object");
-    const hasSchemaVersion = Number.isFinite(Number(data?.schema_version));
-    const hasTimestamps = Boolean(data?.created_at) && Boolean(data?.updated_at);
-    const isValid = hasPayload && hasSchemaVersion && hasTimestamps;
-
-    if (!data) {
-      setSupabaseStatus(
-        "Schema gefunden, aber Seed-Row 'global' fehlt. Bitte DEF-108 SQL-Skript ausführen.",
-        true
-      );
-      return;
+    const positionsProbe = await supabaseClient
+      .from(SUPABASE_POSITIONS_TABLE)
+      .select("id,wallet_id,asset_name,amount,value,created_at,updated_at")
+      .limit(1);
+    if (positionsProbe.error) {
+      throw positionsProbe.error;
     }
 
-    if (!isValid) {
-      setSupabaseStatus("Schema unvollständig. Bitte DEF-108 SQL-Skript erneut ausführen.", true);
-      return;
-    }
-
-    setSupabaseStatus("DEF-108 Schema aktiv: Tabelle, Spalten und Seed-Row sind vorhanden.");
+    setSupabaseStatus("DEF-108 Schema aktiv: relationale Tabellen wallets + positions sind erreichbar.");
   } catch (error) {
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
     setSupabaseStatus(`Schema-Prüfung fehlgeschlagen: ${message}`, true);
   }
 }
 
-function normalizeRemoteState(payload) {
-  if (!payload || typeof payload !== "object") {
-    return null;
+function toDateTimeLocalHour(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return localDateTimeNowHour();
   }
-  const positionsList = Array.isArray(payload.positions) ? payload.positions.map(normalizePosition).filter(Boolean) : null;
-  const walletList = Array.isArray(payload.wallets)
-    ? payload.wallets.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0)
-    : null;
-  if (!positionsList || !walletList || walletList.length === 0) {
-    return null;
-  }
-  return {
-    positions: positionsList,
-    wallets: walletList,
-    updatedAt: typeof payload.updatedAt === "string" ? payload.updatedAt : null
-  };
+  date.setMinutes(0, 0, 0);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(
+    date.getHours()
+  ).padStart(2, "0")}:00`;
 }
 
 async function saveStateToSupabase(reason = "update") {
@@ -671,18 +652,47 @@ async function saveStateToSupabase(reason = "update") {
     if (suppressRemoteSync || !supabaseClient) {
       return;
     }
-    const snapshot = getLocalStateSnapshot();
     try {
-      const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
-        {
-          id: SUPABASE_STATE_ID,
-          payload: snapshot,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: "id" }
-      );
-      if (error) {
-        throw error;
+      const walletRows = wallets.map((name) => ({
+        name,
+        user_id: null
+      }));
+      const { error: deletePositionsError } = await supabaseClient
+        .from(SUPABASE_POSITIONS_TABLE)
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (deletePositionsError) throw deletePositionsError;
+
+      const { error: deleteWalletsError } = await supabaseClient
+        .from(SUPABASE_WALLETS_TABLE)
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (deleteWalletsError) throw deleteWalletsError;
+
+      const { data: insertedWallets, error: walletInsertError } = await supabaseClient
+        .from(SUPABASE_WALLETS_TABLE)
+        .insert(walletRows)
+        .select("id,name");
+      if (walletInsertError) throw walletInsertError;
+
+      const walletIdByName = new Map((insertedWallets || []).map((wallet) => [wallet.name, wallet.id]));
+      const firstWallet = insertedWallets?.[0];
+      if (!firstWallet) {
+        throw new Error("Keine Wallet konnte gespeichert werden.");
+      }
+
+      const positionRows = positions.map((entry) => ({
+        id: entry.id,
+        wallet_id: walletIdByName.get(entry.wallet) || firstWallet.id,
+        asset_name: entry.strategyName || entry.projectName || "Unknown Asset",
+        amount: Number(entry.investedAmount || 0),
+        value: Number(entry.currentValue || 0),
+        created_at: parsePositionDate(entry.date)?.toISOString() || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      if (positionRows.length > 0) {
+        const { error: insertPositionsError } = await supabaseClient.from(SUPABASE_POSITIONS_TABLE).insert(positionRows);
+        if (insertPositionsError) throw insertPositionsError;
       }
       setSupabaseStatus(`Supabase Sync erfolgreich (${reason}).`);
     } catch (error) {
@@ -698,24 +708,50 @@ async function loadStateFromSupabase() {
     return;
   }
   try {
-    const { data, error } = await supabaseClient
-      .from(SUPABASE_STATE_TABLE)
-      .select("payload,updated_at")
-      .eq("id", SUPABASE_STATE_ID)
-      .maybeSingle();
-    if (error) {
-      throw error;
-    }
+    const { data: walletRows, error: walletError } = await supabaseClient
+      .from(SUPABASE_WALLETS_TABLE)
+      .select("id,name,created_at")
+      .order("created_at", { ascending: true });
+    if (walletError) throw walletError;
 
-    const remote = normalizeRemoteState(data?.payload);
-    if (!remote) {
+    const walletList = (walletRows || []).map((wallet) => String(wallet.name || "").trim()).filter(Boolean);
+    const walletIdToName = new Map((walletRows || []).map((wallet) => [wallet.id, wallet.name]));
+
+    if (walletList.length === 0) {
       await saveStateToSupabase("initial");
       return;
     }
 
+    const { data: positionRows, error: positionError } = await supabaseClient
+      .from(SUPABASE_POSITIONS_TABLE)
+      .select("id,wallet_id,asset_name,amount,value,created_at,updated_at")
+      .order("created_at", { ascending: false });
+    if (positionError) throw positionError;
+
+    const mappedPositions = (positionRows || [])
+      .map((row) =>
+        normalizePosition({
+          id: row.id,
+          type: "strategy",
+          date: toDateTimeLocalHour(row.created_at),
+          wallet: walletIdToName.get(row.wallet_id) || walletList[0],
+          chain: DEFAULT_CHAIN,
+          projectName: "Supabase",
+          currency: "USDC",
+          strategyName: row.asset_name || "Unknown Asset",
+          investedAmount: Number(row.amount || 0),
+          currentValue: Number(row.value || 0),
+          interestAmount: Math.max(0, Number(row.value || 0) - Number(row.amount || 0)),
+          calculationMode: "current",
+          notes: "",
+          status: "active"
+        })
+      )
+      .filter(Boolean);
+
     suppressRemoteSync = true;
-    wallets = remote.wallets;
-    positions = remote.positions;
+    wallets = walletList;
+    positions = mappedPositions;
     render();
     suppressRemoteSync = false;
     setSupabaseStatus("Supabase Daten geladen.");
