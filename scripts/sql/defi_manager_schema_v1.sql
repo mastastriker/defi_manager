@@ -101,6 +101,10 @@ $$;
 alter table public.wallets enable row level security;
 alter table public.positions enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant select, insert, update, delete on public.wallets to anon, authenticated;
+grant select, insert, update, delete on public.positions to anon, authenticated;
+
 -- RLS fuer aktuelle frontend-only Nutzung (anon)
 do $$
 begin
@@ -166,6 +170,26 @@ begin
   ) then
     create policy positions_delete_anon on public.positions
       for delete to anon using (true);
+  end if;
+end
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'wallets' and policyname = 'wallets_rw_authenticated'
+  ) then
+    create policy wallets_rw_authenticated on public.wallets
+      for all to authenticated using (true) with check (true);
+  end if;
+
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'positions' and policyname = 'positions_rw_authenticated'
+  ) then
+    create policy positions_rw_authenticated on public.positions
+      for all to authenticated using (true) with check (true);
   end if;
 end
 $$;
