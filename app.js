@@ -717,11 +717,6 @@ async function loadStateFromSupabase() {
     const walletList = (walletRows || []).map((wallet) => String(wallet.name || "").trim()).filter(Boolean);
     const walletIdToName = new Map((walletRows || []).map((wallet) => [wallet.id, wallet.name]));
 
-    if (walletList.length === 0) {
-      await saveStateToSupabase("initial");
-      return;
-    }
-
     const { data: positionRows, error: positionError } = await supabaseClient
       .from(SUPABASE_POSITIONS_TABLE)
       .select("id,wallet_id,asset_name,amount,value,created_at,updated_at")
@@ -734,7 +729,7 @@ async function loadStateFromSupabase() {
           id: row.id,
           type: "strategy",
           date: toDateTimeLocalHour(row.created_at),
-          wallet: walletIdToName.get(row.wallet_id) || walletList[0],
+          wallet: walletIdToName.get(row.wallet_id) || walletList[0] || DEFAULT_WALLETS[0],
           chain: DEFAULT_CHAIN,
           projectName: "Supabase",
           currency: "USDC",
@@ -750,11 +745,11 @@ async function loadStateFromSupabase() {
       .filter(Boolean);
 
     suppressRemoteSync = true;
-    wallets = walletList;
+    wallets = walletList.length > 0 ? walletList : [...DEFAULT_WALLETS];
     positions = mappedPositions;
     render();
     suppressRemoteSync = false;
-    setSupabaseStatus("Supabase Daten geladen.");
+    setSupabaseStatus(`Supabase Daten geladen (${positions.length} Positionen, ${wallets.length} Wallets).`);
   } catch (error) {
     suppressRemoteSync = false;
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
