@@ -3,6 +3,7 @@ const STORAGE_KEYS = {
   legacy: "defi-dashboard-positions-v1",
   backup: "defi-dashboard-positions-backup-v1"
 };
+const SUPABASE_STORAGE_KEY = "defi-dashboard-supabase-config-v1";
 const STORAGE_VERSION = 2;
 const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
@@ -448,6 +449,23 @@ function getLocalStateSnapshot() {
   };
 }
 
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 function setSupabaseStatus(message, isError = false) {
   if (!supabaseStatus) {
     return;
@@ -457,7 +475,29 @@ function setSupabaseStatus(message, isError = false) {
 }
 
 function readSupabaseConfig() {
-  return manualSupabaseConfig;
+  const raw = readStorage(SUPABASE_STORAGE_KEY);
+  if (!raw) {
+    return manualSupabaseConfig;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return manualSupabaseConfig;
+    }
+    const url = typeof parsed.url === "string" ? parsed.url.trim() : "";
+    const anonKey = typeof parsed.anonKey === "string" ? parsed.anonKey.trim() : "";
+    if (!url || !anonKey) {
+      return manualSupabaseConfig;
+    }
+    return {
+      url,
+      anonKey,
+      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
+      lastCheckedAt: typeof parsed.lastCheckedAt === "string" ? parsed.lastCheckedAt : null
+    };
+  } catch (_error) {
+    return manualSupabaseConfig;
+  }
 }
 
 function readSupabaseConfigFromRuntime() {
@@ -485,7 +525,7 @@ function writeSupabaseConfig(config) {
     savedAt: config.savedAt || new Date().toISOString(),
     lastCheckedAt: config.lastCheckedAt || null
   };
-  return true;
+  return writeStorage(SUPABASE_STORAGE_KEY, JSON.stringify(manualSupabaseConfig));
 }
 
 function updateSupabaseMeta(config) {
