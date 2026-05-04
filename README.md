@@ -40,14 +40,10 @@ If you do not want to enter keys in the web UI, use runtime config from environm
 
 3. Start/reload the app. It auto-loads `supabase-config.local.js`.
 4. Open `Wallets` -> `Supabase Verbindung` and click `Verbindung testen`.
-5. Create the state table once in Supabase SQL editor:
+5. Apply the DEF-108 schema once in Supabase SQL editor:
 
 ```sql
-create table if not exists public.defi_manager_state (
-  id text primary key,
-  payload jsonb not null,
-  updated_at timestamptz not null default now()
-);
+-- copy contents of scripts/sql/defi_manager_schema_v1.sql
 ```
 
 Notes:
@@ -55,6 +51,7 @@ Notes:
 - The sample template is `supabase-config.local.sample.js`.
 - Use only the public **anon key** in frontend context, never service role keys.
 - The app stores combined `positions` + `wallets` in row `id='global'` (Supabase-only).
+- Database structure details: `docs/database-structure-def-108.md`
 
 ## Vercel Runtime Config
 
