@@ -25,6 +25,27 @@ npx serve . -l 4173
 
 Open: `http://localhost:4173`
 
+## Supabase via Paperclip ENV (DEF-106)
+
+If you do not want to enter keys in the web UI, use runtime config from environment variables:
+
+1. Store these secrets in Paperclip for this agent/workspace:
+   - `PAPERCLIP_SUPABASE_URL`
+   - `PAPERCLIP_SUPABASE_ANON_KEY`
+2. Generate local runtime config file:
+
+```bash
+./scripts/write-supabase-config-from-env.sh
+```
+
+3. Start/reload the app. It auto-loads `supabase-config.local.js`.
+4. Open `Wallets` -> `Supabase Verbindung` and click `Verbindung testen`.
+
+Notes:
+- `supabase-config.local.js` is gitignored and stays local.
+- The sample template is `supabase-config.local.sample.js`.
+- Use only the public **anon key** in frontend context, never service role keys.
+
 ## Manual-entry and persistence flow
 
 1. Use the `Manual Position Entry` form to add a position (date/time with hour precision).

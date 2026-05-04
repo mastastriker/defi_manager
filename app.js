@@ -96,6 +96,7 @@ let activeTab = "strategy";
 let editingPositionId = null;
 let activePage = "dashboard";
 let supabaseClient = null;
+let supabaseConfigSource = "none";
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -487,6 +488,24 @@ function readSupabaseConfig() {
   }
 }
 
+function readSupabaseConfigFromRuntime() {
+  const config = window.__DEFI_MANAGER_CONFIG__;
+  if (!config || typeof config !== "object") {
+    return null;
+  }
+  const url = typeof config.supabaseUrl === "string" ? config.supabaseUrl.trim() : "";
+  const anonKey = typeof config.supabaseAnonKey === "string" ? config.supabaseAnonKey.trim() : "";
+  if (!url || !anonKey) {
+    return null;
+  }
+  return {
+    url,
+    anonKey,
+    savedAt: new Date().toISOString(),
+    lastCheckedAt: null
+  };
+}
+
 function writeSupabaseConfig(config) {
   const payload = JSON.stringify({
     url: config.url,
@@ -508,7 +527,13 @@ function updateSupabaseMeta(config) {
 
   const savedAt = config.savedAt ? formatArchiveTimestamp(config.savedAt) : "-";
   const lastCheckedAt = config.lastCheckedAt ? formatArchiveTimestamp(config.lastCheckedAt) : "-";
-  supabaseMeta.textContent = `Gespeichert: ${savedAt} | Letzter Test: ${lastCheckedAt}`;
+  const sourceLabel =
+    supabaseConfigSource === "runtime"
+      ? "Quelle: ENV"
+      : supabaseConfigSource === "localstorage"
+        ? "Quelle: localStorage"
+        : "Quelle: -";
+  supabaseMeta.textContent = `${sourceLabel} | Gespeichert: ${savedAt} | Letzter Test: ${lastCheckedAt}`;
 }
 
 function createSupabaseClient(config) {
@@ -557,7 +582,9 @@ async function testSupabaseConnection() {
 }
 
 function initializeSupabaseSettings() {
-  const config = readSupabaseConfig();
+  const runtimeConfig = readSupabaseConfigFromRuntime();
+  const config = runtimeConfig || readSupabaseConfig();
+  supabaseConfigSource = runtimeConfig ? "runtime" : config ? "localstorage" : "none";
   if (config) {
     if (supabaseUrlInput) {
       supabaseUrlInput.value = config.url;
@@ -566,6 +593,22 @@ function initializeSupabaseSettings() {
       supabaseAnonKeyInput.value = config.anonKey;
     }
     supabaseClient = createSupabaseClient(config);
+  }
+  if (supabaseConfigSource === "runtime") {
+    if (supabaseUrlInput) {
+      supabaseUrlInput.readOnly = true;
+    }
+    if (supabaseAnonKeyInput) {
+      supabaseAnonKeyInput.readOnly = true;
+    }
+    if (supabaseForm) {
+      const submit = supabaseForm.querySelector('button[type="submit"]');
+      if (submit instanceof HTMLButtonElement) {
+        submit.disabled = true;
+        submit.textContent = "Per ENV konfiguriert";
+      }
+    }
+    setSupabaseStatus("Supabase per ENV-Konfiguration geladen.");
   }
   updateSupabaseMeta(config);
 }
@@ -1848,6 +1891,10 @@ walletList?.addEventListener("click", (event) => {
 
 supabaseForm?.addEventListener("submit", (event) => {
   event.preventDefault();
+  if (supabaseConfigSource === "runtime") {
+    setSupabaseStatus("Supabase wird per ENV-Konfiguration verwaltet.");
+    return;
+  }
   const url = supabaseUrlInput?.value.trim() || "";
   const anonKey = supabaseAnonKeyInput?.value.trim() || "";
 
