@@ -97,9 +97,8 @@ let editingPositionId = null;
 let activePage = "dashboard";
 let supabaseClient = null;
 let supabaseConfigSource = "none";
-const SUPABASE_STATE_TABLE = "defi_manager_state";
-const SUPABASE_STATE_ID = "global";
-let suppressRemoteSync = false;
+const SUPABASE_WALLETS_TABLE = "defi_wallets";
+const SUPABASE_POSITIONS_TABLE = "defi_positions";
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -457,38 +456,6 @@ function writeStorage(key, value) {
   }
 }
 
-function parseStoredStatePayload(raw) {
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-    const list = Array.isArray(parsed.positions) ? parsed.positions : null;
-    if (!list) {
-      return null;
-    }
-    return {
-      positions: list.map(normalizePosition).filter(Boolean),
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null
-    };
-  } catch (_error) {
-    return null;
-  }
-}
-
-function getLocalStateSnapshot() {
-  const primaryState = parseStoredStatePayload(readStorage(STORAGE_KEYS.primary));
-  const localUpdatedAt = primaryState?.updatedAt || new Date().toISOString();
-  return {
-    positions: [...positions],
-    wallets: [...wallets],
-    updatedAt: localUpdatedAt
-  };
-}
-
 function setSupabaseStatus(message, isError = false) {
   if (!supabaseStatus) {
     return;
@@ -616,80 +583,154 @@ async function testSupabaseConnection() {
   }
 }
 
-function normalizeRemoteState(payload) {
-  if (!payload || typeof payload !== "object") {
-    return null;
+async function loadWalletsFromSupabase() {
+  const { data, error } = await supabaseClient.from(SUPABASE_WALLETS_TABLE).select("name").order("name", { ascending: true });
+  if (error) {
+    throw error;
   }
-  const positionsList = Array.isArray(payload.positions) ? payload.positions.map(normalizePosition).filter(Boolean) : null;
-  const walletList = Array.isArray(payload.wallets)
-    ? payload.wallets.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0)
-    : null;
-  if (!positionsList || !walletList || walletList.length === 0) {
-    return null;
-  }
-  return {
-    positions: positionsList,
-    wallets: walletList,
-    updatedAt: typeof payload.updatedAt === "string" ? payload.updatedAt : null
-  };
+  const names = (data || []).map((entry) => String(entry.name || "").trim()).filter((entry) => entry.length > 0);
+  wallets = names.length > 0 ? names : [...DEFAULT_WALLETS];
 }
 
-async function saveStateToSupabase(reason = "update") {
-  if (suppressRemoteSync || !supabaseClient) {
-    return;
+async function loadPositionsFromSupabase() {
+  const { data, error } = await supabaseClient.from(SUPABASE_POSITIONS_TABLE).select("payload");
+  if (error) {
+    throw error;
   }
-  const snapshot = getLocalStateSnapshot();
+  const normalized = (data || []).map((entry) => normalizePosition(entry.payload)).filter(Boolean);
+  positions = normalized.length > 0 ? normalized : [...initialPositions];
+}
+
+function readLegacyWalletsFromLocalStorage() {
+  const raw = readStorage(WALLET_STORAGE_KEY);
+  if (!raw) {
+    return [];
+  }
   try {
-    const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
-      {
-        id: SUPABASE_STATE_ID,
-        payload: snapshot,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "id" }
-    );
-    if (error) {
-      throw error;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
     }
-    setSupabaseStatus(`Supabase Sync erfolgreich (${reason}).`);
-  } catch (error) {
-    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
-    setSupabaseStatus(`Supabase Sync fehlgeschlagen: ${message}`, true);
+    return parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
+  } catch (_error) {
+    return [];
   }
 }
 
-async function loadStateFromSupabase() {
+function readLegacyPositionsFromLocalStorage() {
+  const storageOrder = [STORAGE_KEYS.primary, STORAGE_KEYS.legacy, STORAGE_KEYS.backup];
+  for (const key of storageOrder) {
+    const raw = readStorage(key);
+    if (!raw) {
+      continue;
+    }
+    try {
+      const parsed = parseStoredPositions(raw);
+      if (parsed && parsed.length > 0) {
+        return parsed;
+      }
+    } catch (_error) {
+      continue;
+    }
+  }
+  return [];
+}
+
+async function migrateLegacyLocalStorageToSupabaseIfNeeded() {
+  const { count: walletsCount, error: walletsCountError } = await supabaseClient
+    .from(SUPABASE_WALLETS_TABLE)
+    .select("*", { count: "exact", head: true });
+  if (walletsCountError) {
+    throw walletsCountError;
+  }
+  const { count: positionsCount, error: positionsCountError } = await supabaseClient
+    .from(SUPABASE_POSITIONS_TABLE)
+    .select("*", { count: "exact", head: true });
+  if (positionsCountError) {
+    throw positionsCountError;
+  }
+
+  if ((walletsCount || 0) > 0 || (positionsCount || 0) > 0) {
+    return false;
+  }
+
+  const legacyWallets = readLegacyWalletsFromLocalStorage();
+  const legacyPositions = readLegacyPositionsFromLocalStorage();
+  const walletsToInsert = (legacyWallets.length > 0 ? legacyWallets : DEFAULT_WALLETS).map((name) => ({ name }));
+  const positionsToInsert = (legacyPositions.length > 0 ? legacyPositions : initialPositions).map((entry) => ({
+    id: entry.id,
+    payload: entry,
+    updated_at: new Date().toISOString()
+  }));
+
+  const { error: walletsInsertError } = await supabaseClient.from(SUPABASE_WALLETS_TABLE).upsert(walletsToInsert, {
+    onConflict: "name"
+  });
+  if (walletsInsertError) {
+    throw walletsInsertError;
+  }
+
+  const { error: positionsInsertError } = await supabaseClient.from(SUPABASE_POSITIONS_TABLE).upsert(positionsToInsert, {
+    onConflict: "id"
+  });
+  if (positionsInsertError) {
+    throw positionsInsertError;
+  }
+
+  return true;
+}
+
+async function saveWalletsToSupabase() {
   if (!supabaseClient) {
     return;
   }
-  try {
-    const { data, error } = await supabaseClient
-      .from(SUPABASE_STATE_TABLE)
-      .select("payload,updated_at")
-      .eq("id", SUPABASE_STATE_ID)
-      .maybeSingle();
-    if (error) {
-      throw error;
-    }
+  const { error: deleteError } = await supabaseClient.from(SUPABASE_WALLETS_TABLE).delete().not("name", "is", null);
+  if (deleteError) {
+    throw deleteError;
+  }
+  const entries = wallets.map((name) => ({ name, updated_at: new Date().toISOString() }));
+  if (entries.length === 0) {
+    return;
+  }
+  const { error: insertError } = await supabaseClient.from(SUPABASE_WALLETS_TABLE).upsert(entries, { onConflict: "name" });
+  if (insertError) {
+    throw insertError;
+  }
+}
 
-    const remote = normalizeRemoteState(data?.payload);
-    if (!remote) {
-      await saveStateToSupabase("initial");
-      return;
-    }
+async function savePositionsToSupabase() {
+  if (!supabaseClient) {
+    return;
+  }
+  const { error: deleteError } = await supabaseClient.from(SUPABASE_POSITIONS_TABLE).delete().not("id", "is", null);
+  if (deleteError) {
+    throw deleteError;
+  }
+  const entries = positions.map((entry) => ({ id: entry.id, payload: entry, updated_at: new Date().toISOString() }));
+  if (entries.length === 0) {
+    return;
+  }
+  const { error: upsertError } = await supabaseClient.from(SUPABASE_POSITIONS_TABLE).upsert(entries, { onConflict: "id" });
+  if (upsertError) {
+    throw upsertError;
+  }
+}
 
-    suppressRemoteSync = true;
-    wallets = remote.wallets;
-    positions = remote.positions;
-    saveWallets();
-    savePositions();
-    render();
-    suppressRemoteSync = false;
-    setSupabaseStatus("Supabase Daten geladen und lokal synchronisiert.");
-  } catch (error) {
-    suppressRemoteSync = false;
-    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
-    setSupabaseStatus(`Supabase Laden fehlgeschlagen: ${message}`, true);
+async function initializeDataStore() {
+  if (!supabaseClient) {
+    setSupabaseStatus("Supabase ist erforderlich. Bitte URL und Key konfigurieren.", true);
+    return;
+  }
+  const migrated = await migrateLegacyLocalStorageToSupabaseIfNeeded();
+  await loadWalletsFromSupabase();
+  await loadPositionsFromSupabase();
+  renderWalletSelect();
+  renderWalletList();
+  render();
+  if (migrated) {
+    setSupabaseStatus("Migration abgeschlossen: LocalStorage-Daten in Supabase übertragen.");
+  } else {
+    setSupabaseStatus("Daten erfolgreich aus Supabase geladen.");
   }
 }
 
@@ -723,9 +764,6 @@ function initializeSupabaseSettings() {
     setSupabaseStatus("Supabase per ENV-Konfiguration geladen.");
   }
   updateSupabaseMeta(config);
-  if (supabaseClient) {
-    loadStateFromSupabase();
-  }
 }
 
 function setWalletStatus(message) {
@@ -734,31 +772,13 @@ function setWalletStatus(message) {
   }
 }
 
-function loadWallets() {
-  const raw = readStorage(WALLET_STORAGE_KEY);
-  if (!raw) {
-    wallets = [...DEFAULT_WALLETS];
-    saveWallets();
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error("Wallet payload invalid");
-    }
-    const cleaned = parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
-    wallets = cleaned.length > 0 ? cleaned : [...DEFAULT_WALLETS];
-  } catch (_error) {
-    wallets = [...DEFAULT_WALLETS];
-  }
-
-  saveWallets();
-}
+function loadWallets() {}
 
 function saveWallets() {
-  writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
-  saveStateToSupabase("wallets");
+  saveWalletsToSupabase().catch((error) => {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setWalletStatus(`Wallet Sync fehlgeschlagen: ${message}`);
+  });
 }
 
 function parseStoredPositions(raw) {
@@ -780,43 +800,13 @@ function fallbackWallet() {
   return wallets[0] || DEFAULT_WALLETS[0];
 }
 
-function loadPositions() {
-  const storageOrder = [STORAGE_KEYS.primary, STORAGE_KEYS.legacy, STORAGE_KEYS.backup];
-  for (const key of storageOrder) {
-    const raw = readStorage(key);
-    if (!raw) {
-      continue;
-    }
-
-    try {
-      const parsed = parseStoredPositions(raw);
-      if (!parsed) {
-        continue;
-      }
-      positions = parsed;
-      savePositions();
-      return;
-    } catch (_error) {
-      continue;
-    }
-  }
-
-  positions = [...initialPositions];
-  savePositions();
-}
+function loadPositions() {}
 
 function savePositions() {
-  const payload = JSON.stringify({
-    version: STORAGE_VERSION,
-    updatedAt: new Date().toISOString(),
-    positions
+  savePositionsToSupabase().catch((error) => {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setStatus(`Positions-Sync fehlgeschlagen: ${message}`);
   });
-  const legacyPayload = JSON.stringify(positions);
-
-  writeStorage(STORAGE_KEYS.primary, payload);
-  writeStorage(STORAGE_KEYS.legacy, legacyPayload);
-  writeStorage(STORAGE_KEYS.backup, legacyPayload);
-  saveStateToSupabase("positionen");
 }
 
 function setStatus(message) {
@@ -1782,7 +1772,7 @@ form.addEventListener("submit", (event) => {
     setStatus("Position aktualisiert.");
   } else {
     positions.unshift(next);
-    setStatus("Position im localStorage des Browsers gespeichert.");
+    setStatus("Position in Supabase gespeichert.");
   }
 
   savePositions();
@@ -2041,13 +2031,24 @@ supabaseTestButton?.addEventListener("click", () => {
   testSupabaseConnection();
 });
 
-loadWallets();
-loadPositions();
 initializeSupabaseSettings();
-setPage(activePage);
-resetFormMode();
-render();
-updateActiveTableColumns();
-updateStrategyColumnLabel();
-updateSortUi();
-console.log("DEF-66 wallet rename update loaded");
+initializeDataStore()
+  .then(() => {
+    setPage(activePage);
+    resetFormMode();
+    updateActiveTableColumns();
+    updateStrategyColumnLabel();
+    updateSortUi();
+  })
+  .catch((error) => {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Initialisierung fehlgeschlagen: ${message}`, true);
+    wallets = [...DEFAULT_WALLETS];
+    positions = [...initialPositions];
+    render();
+    setPage(activePage);
+    resetFormMode();
+    updateActiveTableColumns();
+    updateStrategyColumnLabel();
+    updateSortUi();
+  });
