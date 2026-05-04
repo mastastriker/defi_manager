@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   backup: "defi-dashboard-positions-backup-v1"
 };
 const WALLET_STORAGE_KEY = "defi-dashboard-wallets-v1";
+const SUPABASE_STORAGE_KEY = "defi-dashboard-supabase-config-v1";
 const STORAGE_VERSION = 2;
 const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
@@ -94,6 +95,7 @@ let wallets = [];
 let activeTab = "strategy";
 let editingPositionId = null;
 let activePage = "dashboard";
+let supabaseClient = null;
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -148,6 +150,12 @@ const walletNameInput = document.getElementById("wallet-name");
 const walletList = document.getElementById("wallet-list");
 const walletStatus = document.getElementById("wallet-status");
 const walletCount = document.getElementById("wallet-count");
+const supabaseForm = document.getElementById("supabase-form");
+const supabaseUrlInput = document.getElementById("supabase-url");
+const supabaseAnonKeyInput = document.getElementById("supabase-anon-key");
+const supabaseTestButton = document.getElementById("supabase-test-btn");
+const supabaseStatus = document.getElementById("supabase-status");
+const supabaseMeta = document.getElementById("supabase-meta");
 
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
@@ -443,6 +451,123 @@ function writeStorage(key, value) {
   } catch (_error) {
     return false;
   }
+}
+
+function setSupabaseStatus(message, isError = false) {
+  if (!supabaseStatus) {
+    return;
+  }
+  supabaseStatus.textContent = message;
+  supabaseStatus.style.color = isError ? "#ffb4b4" : "#bdd8ff";
+}
+
+function readSupabaseConfig() {
+  const raw = readStorage(SUPABASE_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const url = typeof parsed.url === "string" ? parsed.url.trim() : "";
+    const anonKey = typeof parsed.anonKey === "string" ? parsed.anonKey.trim() : "";
+    if (!url || !anonKey) {
+      return null;
+    }
+    return {
+      url,
+      anonKey,
+      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
+      lastCheckedAt: typeof parsed.lastCheckedAt === "string" ? parsed.lastCheckedAt : null
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function writeSupabaseConfig(config) {
+  const payload = JSON.stringify({
+    url: config.url,
+    anonKey: config.anonKey,
+    savedAt: config.savedAt || new Date().toISOString(),
+    lastCheckedAt: config.lastCheckedAt || null
+  });
+  return writeStorage(SUPABASE_STORAGE_KEY, payload);
+}
+
+function updateSupabaseMeta(config) {
+  if (!supabaseMeta) {
+    return;
+  }
+  if (!config) {
+    supabaseMeta.textContent = "Keine Supabase-Konfiguration gespeichert.";
+    return;
+  }
+
+  const savedAt = config.savedAt ? formatArchiveTimestamp(config.savedAt) : "-";
+  const lastCheckedAt = config.lastCheckedAt ? formatArchiveTimestamp(config.lastCheckedAt) : "-";
+  supabaseMeta.textContent = `Gespeichert: ${savedAt} | Letzter Test: ${lastCheckedAt}`;
+}
+
+function createSupabaseClient(config) {
+  const factory = window.supabase?.createClient;
+  if (!factory) {
+    return null;
+  }
+  return factory(config.url, config.anonKey);
+}
+
+async function testSupabaseConnection() {
+  const config = readSupabaseConfig();
+  if (!config) {
+    setSupabaseStatus("Bitte zuerst Supabase URL und Anon Key speichern.", true);
+    updateSupabaseMeta(null);
+    return;
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createSupabaseClient(config);
+  }
+
+  if (!supabaseClient) {
+    setSupabaseStatus("Supabase SDK nicht geladen. Seite neu laden und erneut testen.", true);
+    return;
+  }
+
+  setSupabaseStatus("Teste Verbindung zu Supabase...");
+  try {
+    const { error } = await supabaseClient.auth.getSession();
+    if (error) {
+      throw error;
+    }
+
+    const updatedConfig = {
+      ...config,
+      lastCheckedAt: new Date().toISOString()
+    };
+    writeSupabaseConfig(updatedConfig);
+    updateSupabaseMeta(updatedConfig);
+    setSupabaseStatus("Supabase Verbindung erfolgreich.");
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Supabase Verbindung fehlgeschlagen: ${message}`, true);
+  }
+}
+
+function initializeSupabaseSettings() {
+  const config = readSupabaseConfig();
+  if (config) {
+    if (supabaseUrlInput) {
+      supabaseUrlInput.value = config.url;
+    }
+    if (supabaseAnonKeyInput) {
+      supabaseAnonKeyInput.value = config.anonKey;
+    }
+    supabaseClient = createSupabaseClient(config);
+  }
+  updateSupabaseMeta(config);
 }
 
 function setWalletStatus(message) {
@@ -1721,8 +1846,40 @@ walletList?.addEventListener("click", (event) => {
   setWalletStatus(`Wallet "${walletName}" gelöscht.`);
 });
 
+supabaseForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  const url = supabaseUrlInput?.value.trim() || "";
+  const anonKey = supabaseAnonKeyInput?.value.trim() || "";
+
+  if (!url || !anonKey) {
+    setSupabaseStatus("Supabase URL und Anon Key sind erforderlich.", true);
+    return;
+  }
+
+  const nextConfig = {
+    url,
+    anonKey,
+    savedAt: new Date().toISOString(),
+    lastCheckedAt: null
+  };
+  const saved = writeSupabaseConfig(nextConfig);
+  if (!saved) {
+    setSupabaseStatus("Supabase Konfiguration konnte nicht gespeichert werden.", true);
+    return;
+  }
+
+  supabaseClient = createSupabaseClient(nextConfig);
+  updateSupabaseMeta(nextConfig);
+  setSupabaseStatus("Supabase Konfiguration gespeichert. Jetzt Verbindung testen.");
+});
+
+supabaseTestButton?.addEventListener("click", () => {
+  testSupabaseConnection();
+});
+
 loadWallets();
 loadPositions();
+initializeSupabaseSettings();
 setPage(activePage);
 resetFormMode();
 render();

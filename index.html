@@ -426,9 +426,30 @@
           <p id="wallet-status" class="form-status" role="status" aria-live="polite"></p>
           <ul id="wallet-list" class="wallet-list"></ul>
         </section>
+        <section class="panel" aria-label="Supabase Verbindung">
+          <h2>Supabase Verbindung</h2>
+          <p class="meta-note">Supabase URL und Anon Key speichern und Verbindung testen.</p>
+          <form id="supabase-form" class="wallet-form">
+            <label>
+              Supabase URL
+              <input id="supabase-url" type="url" placeholder="https://xyzcompany.supabase.co" required />
+            </label>
+            <label>
+              Supabase Anon Key
+              <input id="supabase-anon-key" type="password" placeholder="eyJhbGciOi..." required />
+            </label>
+            <button type="submit" class="btn-primary">Supabase speichern</button>
+          </form>
+          <div class="supabase-actions">
+            <button id="supabase-test-btn" type="button" class="wallet-action-btn">Verbindung testen</button>
+            <p id="supabase-meta" class="wallet-count-wrap"></p>
+          </div>
+          <p id="supabase-status" class="form-status" role="status" aria-live="polite"></p>
+        </section>
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="app.js"></script>
   </body>
 </html>
