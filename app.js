@@ -858,17 +858,16 @@ async function copyLocalStorageToSupabase() {
   }
   const localPositions = readLocalPositionsForManualSync();
   const localWallets = readLocalWalletsForManualSync();
-  const usingVisibleStateFallback = localPositions.length === 0 && localWallets.length === 0;
+  if (localPositions.length === 0 && localWallets.length === 0) {
+    setLocalSyncStatus("Keine LocalStorage-Daten gefunden.", true);
+    return;
+  }
+
   const snapshot = {
     positions: localPositions.length > 0 ? localPositions : [...positions],
     wallets: localWallets.length > 0 ? localWallets : [...wallets],
     updatedAt: new Date().toISOString()
   };
-
-  if (snapshot.positions.length === 0 && snapshot.wallets.length === 0) {
-    setLocalSyncStatus("Keine Daten zum Kopieren gefunden.", true);
-    return;
-  }
 
   try {
     const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
@@ -882,8 +881,7 @@ async function copyLocalStorageToSupabase() {
     if (error) {
       throw error;
     }
-    const sourceLabel = usingVisibleStateFallback ? "sichtbarer App-Status" : "LocalStorage";
-    setLocalSyncStatus(`Sync erfolgreich: ${snapshot.positions.length} Position(en) aus ${sourceLabel} kopiert.`);
+    setLocalSyncStatus(`Sync erfolgreich: ${snapshot.positions.length} Position(en) kopiert.`);
     setSupabaseStatus("Supabase Snapshot aus LocalStorage aktualisiert.");
   } catch (error) {
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
