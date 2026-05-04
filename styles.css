@@ -271,6 +271,19 @@ select {
   flex-wrap: wrap;
 }
 
+.supabase-debug {
+  margin: 0.7rem 0 0;
+  padding: 0.65rem;
+  max-width: 720px;
+  border: 1px solid var(--line);
+  border-radius: 0.55rem;
+  background: rgba(8, 15, 28, 0.76);
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .wallet-form label {
   display: grid;
   gap: 0.3rem;

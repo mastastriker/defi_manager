@@ -162,6 +162,7 @@ const supabaseTestButton = document.getElementById("supabase-test-btn");
 const supabaseSchemaButton = document.getElementById("supabase-schema-btn");
 const supabaseStatus = document.getElementById("supabase-status");
 const supabaseMeta = document.getElementById("supabase-meta");
+const supabaseDebug = document.getElementById("supabase-debug");
 
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
@@ -557,6 +558,19 @@ function createSupabaseClient(config) {
   return factory(config.url, config.anonKey);
 }
 
+function setSupabaseDebugInfo(info) {
+  if (!supabaseDebug) {
+    return;
+  }
+  if (!info) {
+    supabaseDebug.hidden = true;
+    supabaseDebug.textContent = "";
+    return;
+  }
+  supabaseDebug.hidden = false;
+  supabaseDebug.textContent = info;
+}
+
 async function testSupabaseConnection() {
   const config = readSupabaseConfig();
   if (!config) {
@@ -750,10 +764,20 @@ async function loadStateFromSupabase() {
     render();
     suppressRemoteSync = false;
     setSupabaseStatus(`Supabase Daten geladen (${positions.length} Positionen, ${wallets.length} Wallets).`);
+    setSupabaseDebugInfo(
+      [
+        `wallet_rows=${walletRows?.length || 0}`,
+        `position_rows=${positionRows?.length || 0}`,
+        `mapped_positions=${mappedPositions.length}`,
+        `wallet_names=${wallets.join(", ") || "-"}`,
+        `position_ids=${mappedPositions.map((entry) => entry.id).join(", ") || "-"}`
+      ].join("\n")
+    );
   } catch (error) {
     suppressRemoteSync = false;
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
     setSupabaseStatus(`Supabase Laden fehlgeschlagen: ${message}`, true);
+    setSupabaseDebugInfo(`load_error=${message}`);
   }
 }
 
