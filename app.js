@@ -3,8 +3,6 @@ const STORAGE_KEYS = {
   legacy: "defi-dashboard-positions-v1",
   backup: "defi-dashboard-positions-backup-v1"
 };
-const WALLET_STORAGE_KEY = "defi-dashboard-wallets-v1";
-const SUPABASE_STORAGE_KEY = "defi-dashboard-supabase-config-v1";
 const STORAGE_VERSION = 2;
 const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
@@ -100,6 +98,7 @@ let supabaseConfigSource = "none";
 const SUPABASE_STATE_TABLE = "defi_manager_state";
 const SUPABASE_STATE_ID = "global";
 let suppressRemoteSync = false;
+let manualSupabaseConfig = null;
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -440,52 +439,11 @@ function normalizePosition(entry) {
   };
 }
 
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch (_error) {
-    return null;
-  }
-}
-
-function writeStorage(key, value) {
-  try {
-    localStorage.setItem(key, value);
-    return true;
-  } catch (_error) {
-    return false;
-  }
-}
-
-function parseStoredStatePayload(raw) {
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-    const list = Array.isArray(parsed.positions) ? parsed.positions : null;
-    if (!list) {
-      return null;
-    }
-    return {
-      positions: list.map(normalizePosition).filter(Boolean),
-      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null
-    };
-  } catch (_error) {
-    return null;
-  }
-}
-
 function getLocalStateSnapshot() {
-  const primaryState = parseStoredStatePayload(readStorage(STORAGE_KEYS.primary));
-  const localUpdatedAt = primaryState?.updatedAt || new Date().toISOString();
   return {
     positions: [...positions],
     wallets: [...wallets],
-    updatedAt: localUpdatedAt
+    updatedAt: new Date().toISOString()
   };
 }
 
@@ -498,29 +456,7 @@ function setSupabaseStatus(message, isError = false) {
 }
 
 function readSupabaseConfig() {
-  const raw = readStorage(SUPABASE_STORAGE_KEY);
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return null;
-    }
-    const url = typeof parsed.url === "string" ? parsed.url.trim() : "";
-    const anonKey = typeof parsed.anonKey === "string" ? parsed.anonKey.trim() : "";
-    if (!url || !anonKey) {
-      return null;
-    }
-    return {
-      url,
-      anonKey,
-      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
-      lastCheckedAt: typeof parsed.lastCheckedAt === "string" ? parsed.lastCheckedAt : null
-    };
-  } catch (_error) {
-    return null;
-  }
+  return manualSupabaseConfig;
 }
 
 function readSupabaseConfigFromRuntime() {
@@ -542,13 +478,13 @@ function readSupabaseConfigFromRuntime() {
 }
 
 function writeSupabaseConfig(config) {
-  const payload = JSON.stringify({
+  manualSupabaseConfig = {
     url: config.url,
     anonKey: config.anonKey,
     savedAt: config.savedAt || new Date().toISOString(),
     lastCheckedAt: config.lastCheckedAt || null
-  });
-  return writeStorage(SUPABASE_STORAGE_KEY, payload);
+  };
+  return true;
 }
 
 function updateSupabaseMeta(config) {
@@ -565,8 +501,8 @@ function updateSupabaseMeta(config) {
   const sourceLabel =
     supabaseConfigSource === "runtime"
       ? "Quelle: ENV"
-      : supabaseConfigSource === "localstorage"
-        ? "Quelle: localStorage"
+      : supabaseConfigSource === "manual"
+        ? "Quelle: Manuell"
         : "Quelle: -";
   supabaseMeta.textContent = `${sourceLabel} | Gespeichert: ${savedAt} | Letzter Test: ${lastCheckedAt}`;
 }
@@ -681,11 +617,9 @@ async function loadStateFromSupabase() {
     suppressRemoteSync = true;
     wallets = remote.wallets;
     positions = remote.positions;
-    saveWallets();
-    savePositions();
     render();
     suppressRemoteSync = false;
-    setSupabaseStatus("Supabase Daten geladen und lokal synchronisiert.");
+    setSupabaseStatus("Supabase Daten geladen.");
   } catch (error) {
     suppressRemoteSync = false;
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
@@ -696,7 +630,7 @@ async function loadStateFromSupabase() {
 function initializeSupabaseSettings() {
   const runtimeConfig = readSupabaseConfigFromRuntime();
   const config = runtimeConfig || readSupabaseConfig();
-  supabaseConfigSource = runtimeConfig ? "runtime" : config ? "localstorage" : "none";
+  supabaseConfigSource = runtimeConfig ? "runtime" : config ? "manual" : "none";
   if (config) {
     if (supabaseUrlInput) {
       supabaseUrlInput.value = config.url;
@@ -735,45 +669,11 @@ function setWalletStatus(message) {
 }
 
 function loadWallets() {
-  const raw = readStorage(WALLET_STORAGE_KEY);
-  if (!raw) {
-    wallets = [...DEFAULT_WALLETS];
-    saveWallets();
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error("Wallet payload invalid");
-    }
-    const cleaned = parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
-    wallets = cleaned.length > 0 ? cleaned : [...DEFAULT_WALLETS];
-  } catch (_error) {
-    wallets = [...DEFAULT_WALLETS];
-  }
-
-  saveWallets();
+  wallets = [...DEFAULT_WALLETS];
 }
 
 function saveWallets() {
-  writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
   saveStateToSupabase("wallets");
-}
-
-function parseStoredPositions(raw) {
-  if (!raw) {
-    return null;
-  }
-
-  const parsed = JSON.parse(raw);
-  const list = Array.isArray(parsed) ? parsed : parsed?.positions;
-  if (!Array.isArray(list)) {
-    return null;
-  }
-
-  const normalized = list.map(normalizePosition).filter(Boolean);
-  return normalized.length > 0 ? normalized : null;
 }
 
 function fallbackWallet() {
@@ -781,41 +681,10 @@ function fallbackWallet() {
 }
 
 function loadPositions() {
-  const storageOrder = [STORAGE_KEYS.primary, STORAGE_KEYS.legacy, STORAGE_KEYS.backup];
-  for (const key of storageOrder) {
-    const raw = readStorage(key);
-    if (!raw) {
-      continue;
-    }
-
-    try {
-      const parsed = parseStoredPositions(raw);
-      if (!parsed) {
-        continue;
-      }
-      positions = parsed;
-      savePositions();
-      return;
-    } catch (_error) {
-      continue;
-    }
-  }
-
   positions = [...initialPositions];
-  savePositions();
 }
 
 function savePositions() {
-  const payload = JSON.stringify({
-    version: STORAGE_VERSION,
-    updatedAt: new Date().toISOString(),
-    positions
-  });
-  const legacyPayload = JSON.stringify(positions);
-
-  writeStorage(STORAGE_KEYS.primary, payload);
-  writeStorage(STORAGE_KEYS.legacy, legacyPayload);
-  writeStorage(STORAGE_KEYS.backup, legacyPayload);
   saveStateToSupabase("positionen");
 }
 
@@ -1782,7 +1651,7 @@ form.addEventListener("submit", (event) => {
     setStatus("Position aktualisiert.");
   } else {
     positions.unshift(next);
-    setStatus("Position im localStorage des Browsers gespeichert.");
+    setStatus("Position gespeichert.");
   }
 
   savePositions();
