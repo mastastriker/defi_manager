@@ -159,6 +159,7 @@ const supabaseForm = document.getElementById("supabase-form");
 const supabaseUrlInput = document.getElementById("supabase-url");
 const supabaseAnonKeyInput = document.getElementById("supabase-anon-key");
 const supabaseTestButton = document.getElementById("supabase-test-btn");
+const supabaseSchemaButton = document.getElementById("supabase-schema-btn");
 const supabaseStatus = document.getElementById("supabase-status");
 const supabaseMeta = document.getElementById("supabase-meta");
 
@@ -590,6 +591,60 @@ async function testSupabaseConnection() {
   } catch (error) {
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
     setSupabaseStatus(`Supabase Verbindung fehlgeschlagen: ${message}`, true);
+  }
+}
+
+async function validateSupabaseSchema() {
+  const config = readSupabaseConfig();
+  if (!config) {
+    setSupabaseStatus("Bitte zuerst Supabase URL und Anon Key speichern.", true);
+    updateSupabaseMeta(null);
+    return;
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createSupabaseClient(config);
+  }
+
+  if (!supabaseClient) {
+    setSupabaseStatus("Supabase SDK nicht geladen. Seite neu laden und erneut testen.", true);
+    return;
+  }
+
+  setSupabaseStatus("Prüfe DEF-108 Datenbankstruktur...");
+  try {
+    const { data, error } = await supabaseClient
+      .from(SUPABASE_STATE_TABLE)
+      .select("id,payload,schema_version,created_at,updated_at")
+      .eq("id", SUPABASE_STATE_ID)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const hasPayload = Boolean(data?.payload && typeof data.payload === "object");
+    const hasSchemaVersion = Number.isFinite(Number(data?.schema_version));
+    const hasTimestamps = Boolean(data?.created_at) && Boolean(data?.updated_at);
+    const isValid = hasPayload && hasSchemaVersion && hasTimestamps;
+
+    if (!data) {
+      setSupabaseStatus(
+        "Schema gefunden, aber Seed-Row 'global' fehlt. Bitte DEF-108 SQL-Skript ausführen.",
+        true
+      );
+      return;
+    }
+
+    if (!isValid) {
+      setSupabaseStatus("Schema unvollständig. Bitte DEF-108 SQL-Skript erneut ausführen.", true);
+      return;
+    }
+
+    setSupabaseStatus("DEF-108 Schema aktiv: Tabelle, Spalten und Seed-Row sind vorhanden.");
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Schema-Prüfung fehlgeschlagen: ${message}`, true);
   }
 }
 
@@ -1952,6 +2007,10 @@ supabaseForm?.addEventListener("submit", (event) => {
 
 supabaseTestButton?.addEventListener("click", () => {
   testSupabaseConnection();
+});
+
+supabaseSchemaButton?.addEventListener("click", () => {
+  validateSupabaseSchema();
 });
 
 loadWallets();
