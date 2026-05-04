@@ -8,6 +8,30 @@ create table if not exists public.defi_manager_state (
   updated_at timestamptz not null default now()
 );
 
+alter table public.defi_manager_state
+  add column if not exists schema_version integer,
+  add column if not exists created_at timestamptz,
+  add column if not exists updated_at timestamptz;
+
+update public.defi_manager_state
+set
+  schema_version = coalesce(schema_version, 1),
+  created_at = coalesce(created_at, now()),
+  updated_at = coalesce(updated_at, now())
+where schema_version is null
+   or created_at is null
+   or updated_at is null;
+
+alter table public.defi_manager_state
+  alter column schema_version set default 1,
+  alter column created_at set default now(),
+  alter column updated_at set default now();
+
+alter table public.defi_manager_state
+  alter column schema_version set not null,
+  alter column created_at set not null,
+  alter column updated_at set not null;
+
 create index if not exists defi_manager_state_updated_at_idx
   on public.defi_manager_state (updated_at desc);
 

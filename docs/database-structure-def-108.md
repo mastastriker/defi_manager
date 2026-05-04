@@ -1,6 +1,7 @@
 # DEF-108 Datenbankstruktur (Supabase)
 
 Diese Struktur standardisiert die Persistenz fuer den DeFi Manager in Supabase.
+Das SQL-Skript ist migrationsfaehig: bestehende Tabellen werden auf den DEF-108 Stand aktualisiert.
 
 ## Tabellen
 

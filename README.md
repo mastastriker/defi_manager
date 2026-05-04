@@ -45,6 +45,7 @@ If you do not want to enter keys in the web UI, use runtime config from environm
 ```sql
 -- copy contents of scripts/sql/defi_manager_schema_v1.sql
 ```
+This script is idempotent and also migrates existing `defi_manager_state` tables to DEF-108.
 
 Notes:
 - `supabase-config.local.js` is gitignored and stays local.
