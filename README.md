@@ -56,6 +56,15 @@ Notes:
 - Use only the public **anon key** in frontend context, never service role keys.
 - The app stores combined `positions` + `wallets` in row `id='global'` (Supabase-only).
 
+## Vercel Runtime Config
+
+For browser-over-browser consistency in production, set these Vercel environment variables:
+
+- `PAPERCLIP_SUPABASE_URL`
+- `PAPERCLIP_SUPABASE_ANON_KEY`
+
+`vercel.json` runs `scripts/write-supabase-config-from-env.sh` during build, which generates `supabase-config.local.js` for all clients.
+
 ## Manual-entry and persistence flow
 
 1. Use the `Manual Position Entry` form to add a position (date/time with hour precision).
