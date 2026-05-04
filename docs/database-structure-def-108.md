@@ -1,41 +1,33 @@
-# DEF-108 Datenbankstruktur (Supabase)
+# DEF-108 Datenbankstruktur (Supabase, relational)
 
-Diese Struktur standardisiert die Persistenz fuer den DeFi Manager in Supabase.
-Das SQL-Skript ist migrationsfaehig: bestehende Tabellen werden auf den DEF-108 Stand aktualisiert.
+DEF-108 nutzt jetzt eine relationale Struktur ohne JSON-Blob.
 
 ## Tabellen
 
-### `public.defi_manager_state`
+### `public.wallets`
 
-Single-Row State Store fuer die aktuelle App-Logik.
+- `id uuid primary key`
+- `user_id uuid references auth.users(id)`
+- `name text not null`
+- `created_at timestamptz not null default now()`
 
-- `id text primary key`: logical record key (aktuell: `global`)
-- `payload jsonb not null`: kompletter App-State (wallets + positions)
-- `schema_version integer not null default 1`: Versionskennung fuer Migrationen
+### `public.positions`
+
+- `id uuid primary key`
+- `wallet_id uuid not null references wallets(id)`
+- `asset_name text not null`
+- `amount numeric not null default 0`
+- `value numeric not null default 0`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
-## Indizes
+## Migration
 
-- `defi_manager_state_updated_at_idx` auf `updated_at desc`
-
-## Trigger
-
-- `set_defi_manager_state_updated_at`: setzt `updated_at` bei jedem Update automatisch
+Das SQL-Skript `scripts/sql/defi_manager_schema_v1.sql` migriert Legacy-Daten aus
+`public.defi_manager_state.payload` in die neuen Tabellen und entfernt danach
+`public.defi_manager_state`.
 
 ## RLS
 
-- RLS aktiviert
-- Policy `defi_manager_state_read_anon`: `select` fuer `anon`
-- Policy `defi_manager_state_insert_anon`: `insert` fuer `anon`
-- Policy `defi_manager_state_update_anon`: `update` fuer `anon`
-
-Hinweis: Diese Policies sind fuer das aktuelle frontend-only MVP ohne Auth gedacht. Sobald Auth eingefuehrt wird, muessen die Policies restriktiv auf authentifizierte Nutzer umgestellt werden.
-
-## Seeder
-
-- Stellt sicher, dass Row `id='global'` existiert
-- Initialisiert leeres Payload-Objekt:
-  - `positions: []`
-  - `wallets: ["Cash1", "Cash2"]`
-  - `version: 2`
+RLS ist fuer beide Tabellen aktiviert und enthaelt fuer das aktuelle
+frontend-only Setup `anon`-Policies fuer `select/insert/update/delete`.
