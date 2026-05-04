@@ -97,6 +97,9 @@ let editingPositionId = null;
 let activePage = "dashboard";
 let supabaseClient = null;
 let supabaseConfigSource = "none";
+const SUPABASE_STATE_TABLE = "defi_manager_state";
+const SUPABASE_STATE_ID = "global";
+let suppressRemoteSync = false;
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -454,6 +457,38 @@ function writeStorage(key, value) {
   }
 }
 
+function parseStoredStatePayload(raw) {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const list = Array.isArray(parsed.positions) ? parsed.positions : null;
+    if (!list) {
+      return null;
+    }
+    return {
+      positions: list.map(normalizePosition).filter(Boolean),
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : null
+    };
+  } catch (_error) {
+    return null;
+  }
+}
+
+function getLocalStateSnapshot() {
+  const primaryState = parseStoredStatePayload(readStorage(STORAGE_KEYS.primary));
+  const localUpdatedAt = primaryState?.updatedAt || new Date().toISOString();
+  return {
+    positions: [...positions],
+    wallets: [...wallets],
+    updatedAt: localUpdatedAt
+  };
+}
+
 function setSupabaseStatus(message, isError = false) {
   if (!supabaseStatus) {
     return;
@@ -581,6 +616,83 @@ async function testSupabaseConnection() {
   }
 }
 
+function normalizeRemoteState(payload) {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  const positionsList = Array.isArray(payload.positions) ? payload.positions.map(normalizePosition).filter(Boolean) : null;
+  const walletList = Array.isArray(payload.wallets)
+    ? payload.wallets.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0)
+    : null;
+  if (!positionsList || !walletList || walletList.length === 0) {
+    return null;
+  }
+  return {
+    positions: positionsList,
+    wallets: walletList,
+    updatedAt: typeof payload.updatedAt === "string" ? payload.updatedAt : null
+  };
+}
+
+async function saveStateToSupabase(reason = "update") {
+  if (suppressRemoteSync || !supabaseClient) {
+    return;
+  }
+  const snapshot = getLocalStateSnapshot();
+  try {
+    const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
+      {
+        id: SUPABASE_STATE_ID,
+        payload: snapshot,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "id" }
+    );
+    if (error) {
+      throw error;
+    }
+    setSupabaseStatus(`Supabase Sync erfolgreich (${reason}).`);
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Supabase Sync fehlgeschlagen: ${message}`, true);
+  }
+}
+
+async function loadStateFromSupabase() {
+  if (!supabaseClient) {
+    return;
+  }
+  try {
+    const { data, error } = await supabaseClient
+      .from(SUPABASE_STATE_TABLE)
+      .select("payload,updated_at")
+      .eq("id", SUPABASE_STATE_ID)
+      .maybeSingle();
+    if (error) {
+      throw error;
+    }
+
+    const remote = normalizeRemoteState(data?.payload);
+    if (!remote) {
+      await saveStateToSupabase("initial");
+      return;
+    }
+
+    suppressRemoteSync = true;
+    wallets = remote.wallets;
+    positions = remote.positions;
+    saveWallets();
+    savePositions();
+    render();
+    suppressRemoteSync = false;
+    setSupabaseStatus("Supabase Daten geladen und lokal synchronisiert.");
+  } catch (error) {
+    suppressRemoteSync = false;
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Supabase Laden fehlgeschlagen: ${message}`, true);
+  }
+}
+
 function initializeSupabaseSettings() {
   const runtimeConfig = readSupabaseConfigFromRuntime();
   const config = runtimeConfig || readSupabaseConfig();
@@ -611,6 +723,9 @@ function initializeSupabaseSettings() {
     setSupabaseStatus("Supabase per ENV-Konfiguration geladen.");
   }
   updateSupabaseMeta(config);
+  if (supabaseClient) {
+    loadStateFromSupabase();
+  }
 }
 
 function setWalletStatus(message) {
@@ -643,6 +758,7 @@ function loadWallets() {
 
 function saveWallets() {
   writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
+  saveStateToSupabase("wallets");
 }
 
 function parseStoredPositions(raw) {
@@ -700,6 +816,7 @@ function savePositions() {
   writeStorage(STORAGE_KEYS.primary, payload);
   writeStorage(STORAGE_KEYS.legacy, legacyPayload);
   writeStorage(STORAGE_KEYS.backup, legacyPayload);
+  saveStateToSupabase("positionen");
 }
 
 function setStatus(message) {

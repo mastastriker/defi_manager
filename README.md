@@ -40,11 +40,21 @@ If you do not want to enter keys in the web UI, use runtime config from environm
 
 3. Start/reload the app. It auto-loads `supabase-config.local.js`.
 4. Open `Wallets` -> `Supabase Verbindung` and click `Verbindung testen`.
+5. Create the state table once in Supabase SQL editor:
+
+```sql
+create table if not exists public.defi_manager_state (
+  id text primary key,
+  payload jsonb not null,
+  updated_at timestamptz not null default now()
+);
+```
 
 Notes:
 - `supabase-config.local.js` is gitignored and stays local.
 - The sample template is `supabase-config.local.sample.js`.
 - Use only the public **anon key** in frontend context, never service role keys.
+- The app stores combined `positions` + `wallets` in row `id='global'` and keeps localStorage as fallback.
 
 ## Manual-entry and persistence flow
 
