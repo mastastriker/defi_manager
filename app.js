@@ -99,6 +99,7 @@ const SUPABASE_STATE_TABLE = "defi_manager_state";
 const SUPABASE_STATE_ID = "global";
 let suppressRemoteSync = false;
 let manualSupabaseConfig = null;
+let supabaseSyncQueue = Promise.resolve();
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -571,27 +572,30 @@ function normalizeRemoteState(payload) {
 }
 
 async function saveStateToSupabase(reason = "update") {
-  if (suppressRemoteSync || !supabaseClient) {
-    return;
-  }
-  const snapshot = getLocalStateSnapshot();
-  try {
-    const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
-      {
-        id: SUPABASE_STATE_ID,
-        payload: snapshot,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: "id" }
-    );
-    if (error) {
-      throw error;
+  supabaseSyncQueue = supabaseSyncQueue.finally(async () => {
+    if (suppressRemoteSync || !supabaseClient) {
+      return;
     }
-    setSupabaseStatus(`Supabase Sync erfolgreich (${reason}).`);
-  } catch (error) {
-    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
-    setSupabaseStatus(`Supabase Sync fehlgeschlagen: ${message}`, true);
-  }
+    const snapshot = getLocalStateSnapshot();
+    try {
+      const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
+        {
+          id: SUPABASE_STATE_ID,
+          payload: snapshot,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: "id" }
+      );
+      if (error) {
+        throw error;
+      }
+      setSupabaseStatus(`Supabase Sync erfolgreich (${reason}).`);
+    } catch (error) {
+      const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+      setSupabaseStatus(`Supabase Sync fehlgeschlagen: ${message}`, true);
+    }
+  });
+  return supabaseSyncQueue;
 }
 
 async function loadStateFromSupabase() {
