@@ -161,6 +161,8 @@ const supabaseAnonKeyInput = document.getElementById("supabase-anon-key");
 const supabaseTestButton = document.getElementById("supabase-test-btn");
 const supabaseStatus = document.getElementById("supabase-status");
 const supabaseMeta = document.getElementById("supabase-meta");
+const syncLocalToSupabaseButton = document.getElementById("sync-local-to-supabase-btn");
+const syncLocalToSupabaseStatus = document.getElementById("sync-local-to-supabase-status");
 
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
@@ -510,6 +512,14 @@ function setSupabaseStatus(message, isError = false) {
   supabaseStatus.style.color = isError ? "#ffb4b4" : "#bdd8ff";
 }
 
+function setLocalSyncStatus(message, isError = false) {
+  if (!syncLocalToSupabaseStatus) {
+    return;
+  }
+  syncLocalToSupabaseStatus.textContent = message;
+  syncLocalToSupabaseStatus.style.color = isError ? "#ffb4b4" : "#bdd8ff";
+}
+
 function readSupabaseConfig() {
   const raw = readStorage(SUPABASE_STORAGE_KEY);
   if (!raw) {
@@ -804,6 +814,79 @@ function parseStoredPositions(raw) {
 
   const normalized = list.map(normalizePosition).filter(Boolean);
   return normalized.length > 0 ? normalized : null;
+}
+
+function readLocalPositionsForManualSync() {
+  const storageOrder = [STORAGE_KEYS.primary, STORAGE_KEYS.legacy, STORAGE_KEYS.backup];
+  for (const key of storageOrder) {
+    const raw = readStorage(key);
+    if (!raw) {
+      continue;
+    }
+    try {
+      const parsed = parseStoredPositions(raw);
+      if (parsed && parsed.length > 0) {
+        return parsed;
+      }
+    } catch (_error) {
+      continue;
+    }
+  }
+  return [];
+}
+
+function readLocalWalletsForManualSync() {
+  const raw = readStorage(WALLET_STORAGE_KEY);
+  if (!raw) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
+  } catch (_error) {
+    return [];
+  }
+}
+
+async function copyLocalStorageToSupabase() {
+  if (!supabaseClient) {
+    setLocalSyncStatus("Supabase ist nicht verbunden.", true);
+    return;
+  }
+  const localPositions = readLocalPositionsForManualSync();
+  const localWallets = readLocalWalletsForManualSync();
+  if (localPositions.length === 0 && localWallets.length === 0) {
+    setLocalSyncStatus("Keine LocalStorage-Daten gefunden.", true);
+    return;
+  }
+
+  const snapshot = {
+    positions: localPositions.length > 0 ? localPositions : [...positions],
+    wallets: localWallets.length > 0 ? localWallets : [...wallets],
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    const { error } = await supabaseClient.from(SUPABASE_STATE_TABLE).upsert(
+      {
+        id: SUPABASE_STATE_ID,
+        payload: snapshot,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: "id" }
+    );
+    if (error) {
+      throw error;
+    }
+    setLocalSyncStatus(`Sync erfolgreich: ${snapshot.positions.length} Position(en) kopiert.`);
+    setSupabaseStatus("Supabase Snapshot aus LocalStorage aktualisiert.");
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setLocalSyncStatus(`Sync fehlgeschlagen: ${message}`, true);
+  }
 }
 
 function fallbackWallet() {
@@ -2071,6 +2154,10 @@ supabaseForm?.addEventListener("submit", (event) => {
 
 supabaseTestButton?.addEventListener("click", () => {
   testSupabaseConnection();
+});
+
+syncLocalToSupabaseButton?.addEventListener("click", () => {
+  copyLocalStorageToSupabase();
 });
 
 loadWallets();
