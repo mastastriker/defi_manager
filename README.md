@@ -5,7 +5,7 @@ This repository implements DEF-9 board-scoped v1:
 - Dark, minimal, single-page dashboard
 - Hero + KPI summary + positions table (strict scope)
 - Manual position entry only
-- Supabase persistence for wallets and positions
+- Browser `localStorage` persistence with migration-safe backup
 - Wallet management page with add/delete and dropdown selection in position form
 - No auth, analytics, alerts, or transactions in v1
 
@@ -40,16 +40,10 @@ If you do not want to enter keys in the web UI, use runtime config from environm
 
 3. Start/reload the app. It auto-loads `supabase-config.local.js`.
 4. Open `Wallets` -> `Supabase Verbindung` and click `Verbindung testen`.
-5. Create required tables once in Supabase SQL editor:
+5. Create the state table once in Supabase SQL editor:
 
 ```sql
-create table if not exists public.defi_wallets (
-  name text primary key,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create table if not exists public.defi_positions (
+create table if not exists public.defi_manager_state (
   id text primary key,
   payload jsonb not null,
   updated_at timestamptz not null default now()
@@ -60,8 +54,7 @@ Notes:
 - `supabase-config.local.js` is gitignored and stays local.
 - The sample template is `supabase-config.local.sample.js`.
 - Use only the public **anon key** in frontend context, never service role keys.
-- The app persists wallets in `defi_wallets` and positions in `defi_positions`.
-- Existing browser local data is migrated once into Supabase when DB tables are empty.
+- The app stores combined `positions` + `wallets` in row `id='global'` and keeps localStorage as fallback.
 
 ## Manual-entry and persistence flow
 
@@ -71,7 +64,7 @@ Notes:
 4. The other value is calculated automatically (`Aktueller Wert = Eingezahlt + Zinsen` / `Zinsen = Aktueller Wert - Eingezahlt`).
 5. Position appears in the table and KPI totals update immediately.
 6. Reload the page.
-7. Previously entered positions remain after reload (loaded from `defi_positions`).
+7. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
 8. Delete a row to remove it and persist the removal.
 
 ## Wallet flow (DEF-55 / DEF-66)
@@ -89,7 +82,7 @@ Notes:
 3. Switch to `Archiv` page via top navigation.
 4. Confirm archived row appears with archive timestamp.
 5. Click `Wiederherstellen` and verify it returns to `Dashboard` active table.
-6. Reload page and verify active/archive separation persists in Supabase.
+6. Reload page and verify active/archive separation persists in `localStorage`.
 
 ## Verification notes
 
