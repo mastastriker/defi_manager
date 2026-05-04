@@ -100,6 +100,7 @@ let supabaseConfigSource = "none";
 const SUPABASE_STATE_TABLE = "defi_manager_state";
 const SUPABASE_STATE_ID = "global";
 let suppressRemoteSync = false;
+let localPersistenceEnabled = true;
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -489,6 +490,18 @@ function getLocalStateSnapshot() {
   };
 }
 
+function disableLocalPersistence() {
+  localPersistenceEnabled = false;
+  try {
+    localStorage.removeItem(STORAGE_KEYS.primary);
+    localStorage.removeItem(STORAGE_KEYS.legacy);
+    localStorage.removeItem(STORAGE_KEYS.backup);
+    localStorage.removeItem(WALLET_STORAGE_KEY);
+  } catch (_error) {
+    // ignore storage cleanup errors
+  }
+}
+
 function setSupabaseStatus(message, isError = false) {
   if (!supabaseStatus) {
     return;
@@ -680,12 +693,14 @@ async function loadStateFromSupabase() {
 
     if (!remote) {
       await saveStateToSupabase("initial upload");
+      disableLocalPersistence();
       setSupabaseStatus("Lokale Daten in Supabase hochgeladen.");
       return;
     }
 
     if (hasLocalData && localUpdatedAtMs > remoteUpdatedAtMs) {
       await saveStateToSupabase("local overwrite");
+      disableLocalPersistence();
       setSupabaseStatus("Neuere lokale Daten nach Supabase kopiert.");
       return;
     }
@@ -696,8 +711,9 @@ async function loadStateFromSupabase() {
     saveWallets();
     savePositions();
     render();
+    disableLocalPersistence();
     suppressRemoteSync = false;
-    setSupabaseStatus("Supabase Daten geladen und lokal synchronisiert.");
+    setSupabaseStatus("Supabase Daten geladen. localStorage für Daten ist deaktiviert.");
   } catch (error) {
     suppressRemoteSync = false;
     const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
@@ -769,7 +785,9 @@ function loadWallets() {
 }
 
 function saveWallets() {
-  writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
+  if (localPersistenceEnabled) {
+    writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
+  }
   saveStateToSupabase("wallets");
 }
 
@@ -825,9 +843,11 @@ function savePositions() {
   });
   const legacyPayload = JSON.stringify(positions);
 
-  writeStorage(STORAGE_KEYS.primary, payload);
-  writeStorage(STORAGE_KEYS.legacy, legacyPayload);
-  writeStorage(STORAGE_KEYS.backup, legacyPayload);
+  if (localPersistenceEnabled) {
+    writeStorage(STORAGE_KEYS.primary, payload);
+    writeStorage(STORAGE_KEYS.legacy, legacyPayload);
+    writeStorage(STORAGE_KEYS.backup, legacyPayload);
+  }
   saveStateToSupabase("positionen");
 }
 
