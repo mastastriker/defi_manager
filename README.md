@@ -21,6 +21,12 @@ python3 -m http.server 4173
 ```
 
 Benötigte Variablen:
+- `NEXT_PUBLIC_SUPABASE_URL` (empfohlen in Vercel/Next.js)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (empfohlen in Vercel/Next.js)
+
+Alternativ werden weiterhin unterstützt:
+- `NEXT_PUBLIC_PAPERCLIP_SUPABASE_URL`
+- `NEXT_PUBLIC_PAPERCLIP_SUPABASE_ANON_KEY`
 - `PAPERCLIP_SUPABASE_URL`
 - `PAPERCLIP_SUPABASE_ANON_KEY`
 

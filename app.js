@@ -1,4 +1,20 @@
 function readSupabaseRuntimeConfig() {
+  const nextPublicConfig = {
+    url:
+      window.__NEXT_PUBLIC_SUPABASE_URL__ ||
+      window.NEXT_PUBLIC_SUPABASE_URL ||
+      window.__NEXT_PUBLIC_PAPERCLIP_SUPABASE_URL__ ||
+      window.NEXT_PUBLIC_PAPERCLIP_SUPABASE_URL,
+    anonKey:
+      window.__NEXT_PUBLIC_SUPABASE_ANON_KEY__ ||
+      window.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      window.__NEXT_PUBLIC_PAPERCLIP_SUPABASE_ANON_KEY__ ||
+      window.NEXT_PUBLIC_PAPERCLIP_SUPABASE_ANON_KEY
+  };
+  if (nextPublicConfig.url && nextPublicConfig.anonKey) {
+    return nextPublicConfig;
+  }
+
   const fromDirect = {
     url: window.__PAPERCLIP_SUPABASE_URL__ || window.PAPERCLIP_SUPABASE_URL,
     anonKey: window.__PAPERCLIP_SUPABASE_ANON_KEY__ || window.PAPERCLIP_SUPABASE_ANON_KEY
@@ -43,7 +59,11 @@ function requireSupabase() {
   const config = readSupabaseRuntimeConfig();
   supabaseConfig = config;
   if (!config.url || !config.anonKey) {
-    setStatus(authStatus, "Supabase ENV fehlt: PAPERCLIP_SUPABASE_URL / PAPERCLIP_SUPABASE_ANON_KEY", true);
+    setStatus(
+      authStatus,
+      "Supabase ENV fehlt. Erwartet z.B. NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY oder PAPERCLIP_SUPABASE_*.",
+      true
+    );
     return false;
   }
   if (window.supabase?.createClient) {
