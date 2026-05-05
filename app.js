@@ -14,6 +14,7 @@ function readSupabaseRuntimeConfig() {
 }
 
 let supabase = null;
+let supabaseConfig = null;
 let currentUser = null;
 let portfolios = [];
 let wallets = [];
@@ -40,16 +41,27 @@ function formatUsd(v) {
 
 function requireSupabase() {
   const config = readSupabaseRuntimeConfig();
+  supabaseConfig = config;
   if (!config.url || !config.anonKey) {
     setStatus(authStatus, "Supabase ENV fehlt: PAPERCLIP_SUPABASE_URL / PAPERCLIP_SUPABASE_ANON_KEY", true);
     return false;
   }
-  supabase = window.supabase.createClient(config.url, config.anonKey);
+  if (window.supabase?.createClient) {
+    supabase = window.supabase.createClient(config.url, config.anonKey);
+  } else {
+    supabase = null;
+    setStatus(authStatus, "Hinweis: supabase-js nicht geladen, nutze Auth-REST-Fallback.", false);
+  }
   return true;
 }
 
 async function bootstrapAuth() {
   if (!requireSupabase()) return;
+  if (!supabase) {
+    authView.classList.remove("hidden");
+    appView.classList.add("hidden");
+    return;
+  }
   const { data, error } = await supabase.auth.getSession();
   if (error) {
     setStatus(authStatus, error.message, true);
@@ -61,6 +73,29 @@ async function bootstrapAuth() {
     currentUser = session?.user || null;
     await switchViewBySession();
   });
+}
+
+async function authRestRequest(path, method, body, accessToken) {
+  if (!supabaseConfig?.url || !supabaseConfig?.anonKey) {
+    throw new Error("Supabase Konfiguration fehlt");
+  }
+  const headers = {
+    apikey: supabaseConfig.anonKey,
+    "Content-Type": "application/json"
+  };
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const response = await fetch(`${supabaseConfig.url}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.msg || payload?.error_description || payload?.error || "Auth Anfrage fehlgeschlagen");
+  }
+  return payload;
 }
 
 async function switchViewBySession() {
@@ -291,8 +326,12 @@ function wireEvents() {
     const password = document.getElementById("login-password").value;
     try {
       setStatus(authStatus, "Login läuft...");
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (supabase) {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        await authRestRequest("/auth/v1/token?grant_type=password", "POST", { email, password });
+      }
       setStatus(authStatus, "");
     } catch (error) {
       setStatus(authStatus, error.message || "Login fehlgeschlagen", true);
@@ -310,8 +349,12 @@ function wireEvents() {
     }
     try {
       setStatus(authStatus, "Registrierung läuft...");
-      const { error } = await supabase.auth.signUp({ email, password });
-      if (error) throw error;
+      if (supabase) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+      } else {
+        await authRestRequest("/auth/v1/signup", "POST", { email, password });
+      }
       setStatus(authStatus, "Registrierung erfolgreich. Bitte Email bestätigen.");
       document.getElementById("show-login-btn").click();
     } catch (error) {
@@ -326,8 +369,12 @@ function wireEvents() {
       return;
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
-      if (error) throw error;
+      if (supabase) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        if (error) throw error;
+      } else {
+        await authRestRequest("/auth/v1/recover", "POST", { email });
+      }
       setStatus(authStatus, "Passwort-Reset Email wurde gesendet.");
     } catch (error) {
       setStatus(authStatus, error.message || "Reset fehlgeschlagen", true);
