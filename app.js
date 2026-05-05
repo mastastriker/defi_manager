@@ -13,7 +13,7 @@ function readSupabaseRuntimeConfig() {
   return { url, anonKey };
 }
 
-let supabase = null;
+let supabaseClient = null;
 let supabaseConfig = null;
 let currentUser = null;
 let portfolios = [];
@@ -47,9 +47,9 @@ function requireSupabase() {
     return false;
   }
   if (window.supabase?.createClient) {
-    supabase = window.supabase.createClient(config.url, config.anonKey);
+    supabaseClient = window.supabase.createClient(config.url, config.anonKey);
   } else {
-    supabase = null;
+    supabaseClient = null;
     setStatus(authStatus, "Hinweis: supabase-js nicht geladen, nutze Auth-REST-Fallback.", false);
   }
   return true;
@@ -57,19 +57,19 @@ function requireSupabase() {
 
 async function bootstrapAuth() {
   if (!requireSupabase()) return;
-  if (!supabase) {
+  if (!supabaseClient) {
     authView.classList.remove("hidden");
     appView.classList.add("hidden");
     return;
   }
-  const { data, error } = await supabase.auth.getSession();
+  const { data, error } = await supabaseClient.auth.getSession();
   if (error) {
     setStatus(authStatus, error.message, true);
     return;
   }
   currentUser = data.session?.user || null;
   await switchViewBySession();
-  supabase.auth.onAuthStateChange(async (_event, session) => {
+  supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     currentUser = session?.user || null;
     await switchViewBySession();
   });
@@ -114,9 +114,9 @@ async function refreshData() {
   setStatus(appStatus, "Lade Daten...");
   try {
     const [pRes, wRes, posRes] = await Promise.all([
-      supabase.from("portfolios").select("id,name,user_id,created_at").order("created_at", { ascending: true }),
-      supabase.from("wallets").select("id,name,portfolio_id,user_id,created_at").order("created_at", { ascending: true }),
-      supabase.from("positions").select("id,wallet_id,asset_name,amount,value_usd,created_at,updated_at").order("created_at", { ascending: true })
+      supabaseClient.from("portfolios").select("id,name,user_id,created_at").order("created_at", { ascending: true }),
+      supabaseClient.from("wallets").select("id,name,portfolio_id,user_id,created_at").order("created_at", { ascending: true }),
+      supabaseClient.from("positions").select("id,wallet_id,asset_name,amount,value_usd,created_at,updated_at").order("created_at", { ascending: true })
     ]);
     if (pRes.error) throw pRes.error;
     if (wRes.error) throw wRes.error;
@@ -238,26 +238,26 @@ function renderView() {
 }
 
 async function createPortfolio(name) {
-  const { error, data } = await supabase.from("portfolios").insert([{ name }]).select("id").single();
+  const { error, data } = await supabaseClient.from("portfolios").insert([{ name }]).select("id").single();
   if (error) throw error;
   selectedPortfolioId = data.id;
 }
 
 async function createWallet(name, portfolioId) {
-  const { error } = await supabase.from("wallets").insert([{ name, portfolio_id: portfolioId }]);
+  const { error } = await supabaseClient.from("wallets").insert([{ name, portfolio_id: portfolioId }]);
   if (error) throw error;
 }
 
 async function savePosition(payload) {
   if (payload.id) {
-    const { error } = await supabase
+    const { error } = await supabaseClient
       .from("positions")
       .update({ asset_name: payload.asset_name, amount: payload.amount, value_usd: payload.value_usd })
       .eq("id", payload.id);
     if (error) throw error;
     return;
   }
-  const { error } = await supabase.from("positions").insert([
+  const { error } = await supabaseClient.from("positions").insert([
     {
       wallet_id: payload.wallet_id,
       asset_name: payload.asset_name,
@@ -269,7 +269,7 @@ async function savePosition(payload) {
 }
 
 async function deletePosition(id) {
-  const { error } = await supabase.from("positions").delete().eq("id", id);
+  const { error } = await supabaseClient.from("positions").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -326,8 +326,8 @@ function wireEvents() {
     const password = document.getElementById("login-password").value;
     try {
       setStatus(authStatus, "Login läuft...");
-      if (supabase) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (supabaseClient) {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
         await authRestRequest("/auth/v1/token?grant_type=password", "POST", { email, password });
@@ -349,8 +349,8 @@ function wireEvents() {
     }
     try {
       setStatus(authStatus, "Registrierung läuft...");
-      if (supabase) {
-        const { error } = await supabase.auth.signUp({ email, password });
+      if (supabaseClient) {
+        const { error } = await supabaseClient.auth.signUp({ email, password });
         if (error) throw error;
       } else {
         await authRestRequest("/auth/v1/signup", "POST", { email, password });
@@ -369,8 +369,8 @@ function wireEvents() {
       return;
     }
     try {
-      if (supabase) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+      if (supabaseClient) {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email);
         if (error) throw error;
       } else {
         await authRestRequest("/auth/v1/recover", "POST", { email });
@@ -382,7 +382,7 @@ function wireEvents() {
   });
 
   logoutBtn?.addEventListener("click", async () => {
-    await supabase.auth.signOut();
+    await supabaseClient.auth.signOut();
   });
 
   portfolioSelect.addEventListener("change", () => {
