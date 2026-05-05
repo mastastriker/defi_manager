@@ -5,7 +5,7 @@ This repository implements DEF-9 board-scoped v1:
 - Dark, minimal, single-page dashboard
 - Hero + KPI summary + positions table (strict scope)
 - Manual position entry only
-- Browser `localStorage` persistence with migration-safe backup
+- Supabase-only persistence for wallets and positions
 - Wallet management page with add/delete and dropdown selection in position form
 - No auth, analytics, alerts, or transactions in v1
 
@@ -25,6 +25,44 @@ npx serve . -l 4173
 
 Open: `http://localhost:4173`
 
+## Supabase via Paperclip ENV (DEF-106)
+
+If you do not want to enter keys in the web UI, use runtime config from environment variables:
+
+1. Store these secrets in Paperclip for this agent/workspace:
+   - `PAPERCLIP_SUPABASE_URL`
+   - `PAPERCLIP_SUPABASE_ANON_KEY`
+2. Generate local runtime config file:
+
+```bash
+./scripts/write-supabase-config-from-env.sh
+```
+
+3. Start/reload the app. It auto-loads `supabase-config.local.js`.
+4. Open `Wallets` -> `Supabase Verbindung` and click `Verbindung testen`.
+5. Apply the DEF-108 relational schema once in Supabase SQL editor:
+
+```sql
+-- copy contents of scripts/sql/defi_manager_schema_v1.sql
+```
+This script migrates legacy `defi_manager_state.payload` data into relational tables (`wallets`, `positions`) and removes the old blob table.
+
+Notes:
+- `supabase-config.local.js` is gitignored and stays local.
+- The sample template is `supabase-config.local.sample.js`.
+- Use only the public **anon key** in frontend context, never service role keys.
+- DEF-108 relational target tables: `public.wallets`, `public.positions`.
+- Database structure details: `docs/database-structure-def-108.md`
+
+## Vercel Runtime Config
+
+For browser-over-browser consistency in production, set these Vercel environment variables:
+
+- `PAPERCLIP_SUPABASE_URL`
+- `PAPERCLIP_SUPABASE_ANON_KEY`
+
+`vercel.json` runs `scripts/write-supabase-config-from-env.sh` during build, which generates `supabase-config.local.js` for all clients.
+
 ## Manual-entry and persistence flow
 
 1. Use the `Manual Position Entry` form to add a position (date/time with hour precision).
@@ -33,7 +71,7 @@ Open: `http://localhost:4173`
 4. The other value is calculated automatically (`Aktueller Wert = Eingezahlt + Zinsen` / `Zinsen = Aktueller Wert - Eingezahlt`).
 5. Position appears in the table and KPI totals update immediately.
 6. Reload the page.
-7. Previously entered positions remain (saved in `localStorage` keys `defi-dashboard-positions-v2`, `defi-dashboard-positions-v1`, and `defi-dashboard-positions-backup-v1`).
+7. Previously entered positions remain (loaded from Supabase row `defi_manager_state.id='global'`).
 8. Delete a row to remove it and persist the removal.
 
 ## Wallet flow (DEF-55 / DEF-66)
@@ -51,7 +89,7 @@ Open: `http://localhost:4173`
 3. Switch to `Archiv` page via top navigation.
 4. Confirm archived row appears with archive timestamp.
 5. Click `Wiederherstellen` and verify it returns to `Dashboard` active table.
-6. Reload page and verify active/archive separation persists in `localStorage`.
+6. Reload page and verify active/archive separation persists in Supabase.
 
 ## Verification notes
 
@@ -78,6 +116,10 @@ Open: `http://localhost:4173`
 - Verbindlicher CEO-Code-Owner: `.github/CODEOWNERS` (`@mastastriker`)
 - PR-Checkliste: `.github/pull_request_template.md`
 - Automatische Branch-Gate-Pruefung: `.github/workflows/branch-strategy-gate.yml`
+
+## Operational notes
+
+- DEF-101 (2026-04-24): validated required development-branch commit/push workflow on `codex/v1.1`.
 
 ## Deferred for later scope
 

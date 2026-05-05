@@ -3,7 +3,7 @@ const STORAGE_KEYS = {
   legacy: "defi-dashboard-positions-v1",
   backup: "defi-dashboard-positions-backup-v1"
 };
-const WALLET_STORAGE_KEY = "defi-dashboard-wallets-v1";
+const SUPABASE_STORAGE_KEY = "defi-dashboard-supabase-config-v1";
 const STORAGE_VERSION = 2;
 const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
@@ -23,6 +23,7 @@ const VALID_STATUSES = new Set(["active", "archived"]);
 const CHAIN_ORDER = ["ETH", "ARB", "BASE", "AVAX"];
 const SUPPORTED_CHAINS = new Set(CHAIN_ORDER);
 const DEFAULT_CHAIN = "ETH";
+const DEFAULT_STRATEGY_CURRENCY = "USDC";
 const MS_PER_HOUR = 1000 * 60 * 60;
 const HOURS_PER_YEAR = 365.25 * 24;
 const HOURS_PER_MONTH = HOURS_PER_YEAR / 12;
@@ -74,6 +75,7 @@ const initialPositions = [
     wallet: "Cash1",
     chain: "BASE",
     projectName: "Morpho",
+    currency: "USDC",
     strategyName: "Stablecoin Basis Loop",
     investedAmount: 220000,
     interestAmount: 9500,
@@ -92,6 +94,13 @@ let wallets = [];
 let activeTab = "strategy";
 let editingPositionId = null;
 let activePage = "dashboard";
+let supabaseClient = null;
+let supabaseConfigSource = "none";
+const SUPABASE_WALLETS_TABLE = "wallets";
+const SUPABASE_POSITIONS_TABLE = "positions";
+let suppressRemoteSync = false;
+let manualSupabaseConfig = null;
+let supabaseSyncQueue = Promise.resolve();
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -103,7 +112,10 @@ const walletInput = document.getElementById("position-wallet");
 const chainInput = document.getElementById("position-chain");
 const projectInput = document.getElementById("position-project");
 const strategyNameField = document.getElementById("position-strategy-name-field");
+const strategyNameLabel = document.getElementById("position-strategy-name-label");
 const strategyNameInput = document.getElementById("position-strategy-name");
+const currencyField = document.getElementById("position-currency-field");
+const currencyInput = document.getElementById("position-currency");
 const maturityField = document.getElementById("position-maturity-field");
 const maturityInput = document.getElementById("position-maturity");
 const ptAmountField = document.getElementById("position-pt-amount-field");
@@ -118,10 +130,13 @@ const investedField = document.getElementById("position-invested-field");
 const investedLabel = document.getElementById("position-invested-label");
 const investedInput = document.getElementById("position-invested");
 const interestField = document.getElementById("position-interest-field");
+const interestLabel = document.getElementById("position-interest-label");
 const interestInput = document.getElementById("position-interest");
 const currentField = document.getElementById("position-current-field");
 const currentLabel = document.getElementById("position-current-label");
 const currentInput = document.getElementById("position-current");
+const debtLabel = document.getElementById("position-debt-label");
+const borrowPayoutLabel = document.getElementById("position-borrow-payout-label");
 const notesField = document.getElementById("position-notes-field");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
@@ -140,6 +155,14 @@ const walletNameInput = document.getElementById("wallet-name");
 const walletList = document.getElementById("wallet-list");
 const walletStatus = document.getElementById("wallet-status");
 const walletCount = document.getElementById("wallet-count");
+const supabaseForm = document.getElementById("supabase-form");
+const supabaseUrlInput = document.getElementById("supabase-url");
+const supabaseAnonKeyInput = document.getElementById("supabase-anon-key");
+const supabaseTestButton = document.getElementById("supabase-test-btn");
+const supabaseSchemaButton = document.getElementById("supabase-schema-btn");
+const supabaseStatus = document.getElementById("supabase-status");
+const supabaseMeta = document.getElementById("supabase-meta");
+const supabaseDebug = document.getElementById("supabase-debug");
 
 const kpiCurrent = document.getElementById("kpi-current");
 const kpiApy = document.getElementById("kpi-apy");
@@ -147,6 +170,7 @@ const kpiCashflow = document.getElementById("kpi-cashflow");
 const kpiLendingCost = document.getElementById("kpi-lending-cost");
 const activeTableTitle = document.getElementById("active-table-title");
 const activePositionsTotal = document.getElementById("active-positions-total");
+const activeStrategyColumnLabel = document.getElementById("active-strategy-column-label");
 const activeStrategyNameHeader = document.getElementById("active-strategy-name-header");
 const activeCollateralHeader = document.getElementById("active-collateral-header");
 const activeInterestHeader = document.getElementById("active-interest-header");
@@ -274,13 +298,38 @@ function currentCollateralUnit() {
   return cleaned || "USD";
 }
 
-function updateLendingAmountLabels() {
-  const unit = currentCollateralUnit();
+function currentStrategyCurrencyUnit() {
+  const raw = currencyInput?.value || "";
+  const cleaned = raw.trim();
+  return cleaned || "USD";
+}
+
+function currentAmountUnitForType(positionType) {
+  if (positionType === "lending") {
+    return currentCollateralUnit();
+  }
+  if (positionType === "strategy") {
+    return currentStrategyCurrencyUnit();
+  }
+  return "USD";
+}
+
+function updateAmountLabels(positionType = activeTab) {
+  const unit = currentAmountUnitForType(positionType);
   if (investedLabel) {
     investedLabel.textContent = `Eingezahlter Betrag (${unit})`;
   }
   if (currentLabel) {
     currentLabel.textContent = `Aktueller Wert (${unit})`;
+  }
+  if (interestLabel) {
+    interestLabel.textContent = `Zinsen (${positionType === "strategy" ? unit : "USD"})`;
+  }
+  if (debtLabel) {
+    debtLabel.textContent = "Borrow Schulden (USD, nur Lending/Borrow)";
+  }
+  if (borrowPayoutLabel) {
+    borrowPayoutLabel.textContent = "Borrow Ausgezahlt (USD, nur Lending/Borrow)";
   }
 }
 
@@ -351,6 +400,18 @@ function normalizePosition(entry) {
     : Number.isFinite(Number(entry?.borrowPaidOut))
       ? Math.max(0, Number(entry.borrowPaidOut))
       : 0;
+  const normalizedCurrency = typeof entry?.currency === "string" && entry.currency.trim()
+    ? entry.currency.trim()
+    : safeType === "strategy" && typeof entry?.strategyName === "string" && entry.strategyName.trim()
+      ? entry.strategyName.trim()
+      : safeType === "strategy"
+        ? DEFAULT_STRATEGY_CURRENCY
+        : "USD";
+  const normalizedStrategyName = typeof entry?.strategyName === "string" && entry.strategyName.trim()
+    ? entry.strategyName.trim()
+    : typeof entry?.name === "string" && entry.name.trim()
+      ? entry.name.trim()
+      : "Unbenannte Position";
 
   return {
     id: typeof entry?.id === "string" && entry.id.length > 0 ? entry.id : crypto.randomUUID(),
@@ -365,12 +426,8 @@ function normalizePosition(entry) {
         ? entry.chain.trim().toUpperCase()
         : DEFAULT_CHAIN,
     projectName: typeof entry?.projectName === "string" && entry.projectName.trim() ? entry.projectName.trim() : TYPE_LABELS[safeType],
-    strategyName:
-      typeof entry?.strategyName === "string" && entry.strategyName.trim()
-        ? entry.strategyName.trim()
-        : typeof entry?.name === "string" && entry.name.trim()
-          ? entry.name.trim()
-          : "Unbenannte Position",
+    currency: normalizedCurrency,
+    strategyName: safeType === "strategy" ? normalizedCurrency : normalizedStrategyName,
     investedAmount: normalizedInvested,
     interestAmount: computedInterest,
     currentValue: computedCurrent,
@@ -383,6 +440,14 @@ function normalizePosition(entry) {
     notes: typeof entry?.notes === "string" ? entry.notes.trim() : "",
     status: safeStatus,
     archivedAt: safeStatus === "archived" && typeof entry?.archivedAt === "string" ? entry.archivedAt : null
+  };
+}
+
+function getLocalStateSnapshot() {
+  return {
+    positions: [...positions],
+    wallets: [...wallets],
+    updatedAt: new Date().toISOString()
   };
 }
 
@@ -403,6 +468,354 @@ function writeStorage(key, value) {
   }
 }
 
+function setSupabaseStatus(message, isError = false) {
+  if (!supabaseStatus) {
+    return;
+  }
+  supabaseStatus.textContent = message;
+  supabaseStatus.style.color = isError ? "#ffb4b4" : "#bdd8ff";
+}
+
+function readSupabaseConfig() {
+  const raw = readStorage(SUPABASE_STORAGE_KEY);
+  if (!raw) {
+    return manualSupabaseConfig;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return manualSupabaseConfig;
+    }
+    const url = typeof parsed.url === "string" ? parsed.url.trim() : "";
+    const anonKey = typeof parsed.anonKey === "string" ? parsed.anonKey.trim() : "";
+    if (!url || !anonKey) {
+      return manualSupabaseConfig;
+    }
+    return {
+      url,
+      anonKey,
+      savedAt: typeof parsed.savedAt === "string" ? parsed.savedAt : null,
+      lastCheckedAt: typeof parsed.lastCheckedAt === "string" ? parsed.lastCheckedAt : null
+    };
+  } catch (_error) {
+    return manualSupabaseConfig;
+  }
+}
+
+function readSupabaseConfigFromRuntime() {
+  const config = window.__DEFI_MANAGER_CONFIG__;
+  if (!config || typeof config !== "object") {
+    return null;
+  }
+  const url = typeof config.supabaseUrl === "string" ? config.supabaseUrl.trim() : "";
+  const anonKey = typeof config.supabaseAnonKey === "string" ? config.supabaseAnonKey.trim() : "";
+  if (!url || !anonKey) {
+    return null;
+  }
+  return {
+    url,
+    anonKey,
+    savedAt: new Date().toISOString(),
+    lastCheckedAt: null
+  };
+}
+
+function writeSupabaseConfig(config) {
+  manualSupabaseConfig = {
+    url: config.url,
+    anonKey: config.anonKey,
+    savedAt: config.savedAt || new Date().toISOString(),
+    lastCheckedAt: config.lastCheckedAt || null
+  };
+  return writeStorage(SUPABASE_STORAGE_KEY, JSON.stringify(manualSupabaseConfig));
+}
+
+function updateSupabaseMeta(config) {
+  if (!supabaseMeta) {
+    return;
+  }
+  if (!config) {
+    supabaseMeta.textContent = "Keine Supabase-Konfiguration gespeichert.";
+    return;
+  }
+
+  const savedAt = config.savedAt ? formatArchiveTimestamp(config.savedAt) : "-";
+  const lastCheckedAt = config.lastCheckedAt ? formatArchiveTimestamp(config.lastCheckedAt) : "-";
+  const sourceLabel =
+    supabaseConfigSource === "runtime"
+      ? "Quelle: ENV"
+      : supabaseConfigSource === "manual"
+        ? "Quelle: Manuell"
+        : "Quelle: -";
+  supabaseMeta.textContent = `${sourceLabel} | Gespeichert: ${savedAt} | Letzter Test: ${lastCheckedAt}`;
+}
+
+function createSupabaseClient(config) {
+  const factory = window.supabase?.createClient;
+  if (!factory) {
+    return null;
+  }
+  return factory(config.url, config.anonKey);
+}
+
+function setSupabaseDebugInfo(info) {
+  if (!supabaseDebug) {
+    return;
+  }
+  if (!info) {
+    supabaseDebug.hidden = true;
+    supabaseDebug.textContent = "";
+    return;
+  }
+  supabaseDebug.hidden = false;
+  supabaseDebug.textContent = info;
+}
+
+async function testSupabaseConnection() {
+  const config = readSupabaseConfig();
+  if (!config) {
+    setSupabaseStatus("Bitte zuerst Supabase URL und Anon Key speichern.", true);
+    updateSupabaseMeta(null);
+    return;
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createSupabaseClient(config);
+  }
+
+  if (!supabaseClient) {
+    setSupabaseStatus("Supabase SDK nicht geladen. Seite neu laden und erneut testen.", true);
+    return;
+  }
+
+  setSupabaseStatus("Teste Verbindung zu Supabase...");
+  try {
+    const { error } = await supabaseClient.auth.getSession();
+    if (error) {
+      throw error;
+    }
+
+    const updatedConfig = {
+      ...config,
+      lastCheckedAt: new Date().toISOString()
+    };
+    writeSupabaseConfig(updatedConfig);
+    updateSupabaseMeta(updatedConfig);
+    setSupabaseStatus("Supabase Verbindung erfolgreich.");
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Supabase Verbindung fehlgeschlagen: ${message}`, true);
+  }
+}
+
+async function validateSupabaseSchema() {
+  const config = readSupabaseConfig();
+  if (!config) {
+    setSupabaseStatus("Bitte zuerst Supabase URL und Anon Key speichern.", true);
+    updateSupabaseMeta(null);
+    return;
+  }
+
+  if (!supabaseClient) {
+    supabaseClient = createSupabaseClient(config);
+  }
+
+  if (!supabaseClient) {
+    setSupabaseStatus("Supabase SDK nicht geladen. Seite neu laden und erneut testen.", true);
+    return;
+  }
+
+  setSupabaseStatus("Prüfe DEF-108 Datenbankstruktur...");
+  try {
+    const walletsProbe = await supabaseClient
+      .from(SUPABASE_WALLETS_TABLE)
+      .select("id,user_id,name,created_at")
+      .limit(1);
+    if (walletsProbe.error) {
+      throw walletsProbe.error;
+    }
+
+    const positionsProbe = await supabaseClient
+      .from(SUPABASE_POSITIONS_TABLE)
+      .select("id,wallet_id,asset_name,amount,value,created_at,updated_at")
+      .limit(1);
+    if (positionsProbe.error) {
+      throw positionsProbe.error;
+    }
+
+    setSupabaseStatus("DEF-108 Schema aktiv: relationale Tabellen wallets + positions sind erreichbar.");
+  } catch (error) {
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Schema-Prüfung fehlgeschlagen: ${message}`, true);
+  }
+}
+
+function toDateTimeLocalHour(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return localDateTimeNowHour();
+  }
+  date.setMinutes(0, 0, 0);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T${String(
+    date.getHours()
+  ).padStart(2, "0")}:00`;
+}
+
+async function saveStateToSupabase(reason = "update") {
+  supabaseSyncQueue = supabaseSyncQueue.finally(async () => {
+    if (suppressRemoteSync || !supabaseClient) {
+      return;
+    }
+    try {
+      const walletRows = wallets.map((name) => ({
+        name,
+        user_id: null
+      }));
+      const { error: deletePositionsError } = await supabaseClient
+        .from(SUPABASE_POSITIONS_TABLE)
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (deletePositionsError) throw deletePositionsError;
+
+      const { error: deleteWalletsError } = await supabaseClient
+        .from(SUPABASE_WALLETS_TABLE)
+        .delete()
+        .neq("id", "00000000-0000-0000-0000-000000000000");
+      if (deleteWalletsError) throw deleteWalletsError;
+
+      const { data: insertedWallets, error: walletInsertError } = await supabaseClient
+        .from(SUPABASE_WALLETS_TABLE)
+        .insert(walletRows)
+        .select("id,name");
+      if (walletInsertError) throw walletInsertError;
+
+      const walletIdByName = new Map((insertedWallets || []).map((wallet) => [wallet.name, wallet.id]));
+      const firstWallet = insertedWallets?.[0];
+      if (!firstWallet) {
+        throw new Error("Keine Wallet konnte gespeichert werden.");
+      }
+
+      const positionRows = positions.map((entry) => ({
+        id: entry.id,
+        wallet_id: walletIdByName.get(entry.wallet) || firstWallet.id,
+        asset_name: entry.strategyName || entry.projectName || "Unknown Asset",
+        amount: Number(entry.investedAmount || 0),
+        value: Number(entry.currentValue || 0),
+        created_at: parsePositionDate(entry.date)?.toISOString() || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+      if (positionRows.length > 0) {
+        const { error: insertPositionsError } = await supabaseClient.from(SUPABASE_POSITIONS_TABLE).insert(positionRows);
+        if (insertPositionsError) throw insertPositionsError;
+      }
+      setSupabaseStatus(`Supabase Sync erfolgreich (${reason}).`);
+    } catch (error) {
+      const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+      setSupabaseStatus(`Supabase Sync fehlgeschlagen: ${message}`, true);
+    }
+  });
+  return supabaseSyncQueue;
+}
+
+async function loadStateFromSupabase() {
+  if (!supabaseClient) {
+    return;
+  }
+  try {
+    const { data: walletRows, error: walletError } = await supabaseClient
+      .from(SUPABASE_WALLETS_TABLE)
+      .select("id,name,created_at")
+      .order("created_at", { ascending: true });
+    if (walletError) throw walletError;
+
+    const walletList = (walletRows || []).map((wallet) => String(wallet.name || "").trim()).filter(Boolean);
+    const walletIdToName = new Map((walletRows || []).map((wallet) => [wallet.id, wallet.name]));
+
+    const { data: positionRows, error: positionError } = await supabaseClient
+      .from(SUPABASE_POSITIONS_TABLE)
+      .select("id,wallet_id,asset_name,amount,value,created_at,updated_at")
+      .order("created_at", { ascending: false });
+    if (positionError) throw positionError;
+
+    const mappedPositions = (positionRows || [])
+      .map((row) =>
+        normalizePosition({
+          id: row.id,
+          type: "strategy",
+          date: toDateTimeLocalHour(row.created_at),
+          wallet: walletIdToName.get(row.wallet_id) || walletList[0] || DEFAULT_WALLETS[0],
+          chain: DEFAULT_CHAIN,
+          projectName: "Supabase",
+          currency: "USDC",
+          strategyName: row.asset_name || "Unknown Asset",
+          investedAmount: Number(row.amount || 0),
+          currentValue: Number(row.value || 0),
+          interestAmount: Math.max(0, Number(row.value || 0) - Number(row.amount || 0)),
+          calculationMode: "current",
+          notes: "",
+          status: "active"
+        })
+      )
+      .filter(Boolean);
+
+    suppressRemoteSync = true;
+    wallets = walletList.length > 0 ? walletList : [...DEFAULT_WALLETS];
+    positions = mappedPositions;
+    render();
+    suppressRemoteSync = false;
+    setSupabaseStatus(`Supabase Daten geladen (${positions.length} Positionen, ${wallets.length} Wallets).`);
+    setSupabaseDebugInfo(
+      [
+        `wallet_rows=${walletRows?.length || 0}`,
+        `position_rows=${positionRows?.length || 0}`,
+        `mapped_positions=${mappedPositions.length}`,
+        `wallet_names=${wallets.join(", ") || "-"}`,
+        `position_ids=${mappedPositions.map((entry) => entry.id).join(", ") || "-"}`
+      ].join("\n")
+    );
+  } catch (error) {
+    suppressRemoteSync = false;
+    const message = typeof error?.message === "string" ? error.message : "Unbekannter Fehler";
+    setSupabaseStatus(`Supabase Laden fehlgeschlagen: ${message}`, true);
+    setSupabaseDebugInfo(`load_error=${message}`);
+  }
+}
+
+function initializeSupabaseSettings() {
+  const runtimeConfig = readSupabaseConfigFromRuntime();
+  const config = runtimeConfig || readSupabaseConfig();
+  supabaseConfigSource = runtimeConfig ? "runtime" : config ? "manual" : "none";
+  if (config) {
+    if (supabaseUrlInput) {
+      supabaseUrlInput.value = config.url;
+    }
+    if (supabaseAnonKeyInput) {
+      supabaseAnonKeyInput.value = config.anonKey;
+    }
+    supabaseClient = createSupabaseClient(config);
+  }
+  if (supabaseConfigSource === "runtime") {
+    if (supabaseUrlInput) {
+      supabaseUrlInput.readOnly = true;
+    }
+    if (supabaseAnonKeyInput) {
+      supabaseAnonKeyInput.readOnly = true;
+    }
+    if (supabaseForm) {
+      const submit = supabaseForm.querySelector('button[type="submit"]');
+      if (submit instanceof HTMLButtonElement) {
+        submit.disabled = true;
+        submit.textContent = "Per ENV konfiguriert";
+      }
+    }
+    setSupabaseStatus("Supabase per ENV-Konfiguration geladen.");
+  }
+  updateSupabaseMeta(config);
+  if (supabaseClient) {
+    loadStateFromSupabase();
+  }
+}
+
 function setWalletStatus(message) {
   if (walletStatus) {
     walletStatus.textContent = message;
@@ -410,44 +823,11 @@ function setWalletStatus(message) {
 }
 
 function loadWallets() {
-  const raw = readStorage(WALLET_STORAGE_KEY);
-  if (!raw) {
-    wallets = [...DEFAULT_WALLETS];
-    saveWallets();
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      throw new Error("Wallet payload invalid");
-    }
-    const cleaned = parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
-    wallets = cleaned.length > 0 ? cleaned : [...DEFAULT_WALLETS];
-  } catch (_error) {
-    wallets = [...DEFAULT_WALLETS];
-  }
-
-  saveWallets();
+  wallets = [...DEFAULT_WALLETS];
 }
 
 function saveWallets() {
-  writeStorage(WALLET_STORAGE_KEY, JSON.stringify(wallets));
-}
-
-function parseStoredPositions(raw) {
-  if (!raw) {
-    return null;
-  }
-
-  const parsed = JSON.parse(raw);
-  const list = Array.isArray(parsed) ? parsed : parsed?.positions;
-  if (!Array.isArray(list)) {
-    return null;
-  }
-
-  const normalized = list.map(normalizePosition).filter(Boolean);
-  return normalized.length > 0 ? normalized : null;
+  saveStateToSupabase("wallets");
 }
 
 function fallbackWallet() {
@@ -455,41 +835,11 @@ function fallbackWallet() {
 }
 
 function loadPositions() {
-  const storageOrder = [STORAGE_KEYS.primary, STORAGE_KEYS.legacy, STORAGE_KEYS.backup];
-  for (const key of storageOrder) {
-    const raw = readStorage(key);
-    if (!raw) {
-      continue;
-    }
-
-    try {
-      const parsed = parseStoredPositions(raw);
-      if (!parsed) {
-        continue;
-      }
-      positions = parsed;
-      savePositions();
-      return;
-    } catch (_error) {
-      continue;
-    }
-  }
-
   positions = [...initialPositions];
-  savePositions();
 }
 
 function savePositions() {
-  const payload = JSON.stringify({
-    version: STORAGE_VERSION,
-    updatedAt: new Date().toISOString(),
-    positions
-  });
-  const legacyPayload = JSON.stringify(positions);
-
-  writeStorage(STORAGE_KEYS.primary, payload);
-  writeStorage(STORAGE_KEYS.legacy, legacyPayload);
-  writeStorage(STORAGE_KEYS.backup, legacyPayload);
+  saveStateToSupabase("positionen");
 }
 
 function setStatus(message) {
@@ -699,6 +1049,13 @@ function updatePositionCountLabel() {
   activePositionsTotal.textContent = `(${filteredActivePositions().length})`;
 }
 
+function updateStrategyColumnLabel() {
+  if (!activeStrategyColumnLabel) {
+    return;
+  }
+  activeStrategyColumnLabel.textContent = activeTab === "strategy" ? "Währung" : "Name der Strategie";
+}
+
 function isMaturityColumnVisible() {
   return activeTab === "pendle";
 }
@@ -749,10 +1106,19 @@ function syncTypeSpecificFields(positionType) {
   const isLending = positionType === "lending";
   const isStrategy = positionType === "strategy";
   if (strategyNameField) {
-    strategyNameField.hidden = isLending;
+    strategyNameField.hidden = !isPendle;
+  }
+  if (strategyNameLabel) {
+    strategyNameLabel.textContent = "Name der Strategie";
   }
   if (strategyNameInput) {
-    strategyNameInput.required = !isLending;
+    strategyNameInput.required = isPendle;
+  }
+  if (currencyField) {
+    currencyField.hidden = !isStrategy;
+  }
+  if (currencyInput) {
+    currencyInput.required = isStrategy;
   }
   if (maturityField) {
     maturityField.hidden = !isPendle;
@@ -811,10 +1177,16 @@ function syncTypeSpecificFields(positionType) {
       strategyNameInput.value = "";
     }
   }
+  if (!isStrategy && currencyInput) {
+    currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
+  }
+  if (isStrategy && currencyInput && !currencyInput.value) {
+    currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
+  }
   if (!isStrategy && notesInput) {
     notesInput.value = "";
   }
-  updateLendingAmountLabels();
+  updateAmountLabels(positionType);
 }
 
 function renderWalletSelect() {
@@ -871,10 +1243,11 @@ function getSortValue(entry, key) {
       return chainOrderIndex >= 0 ? chainOrderIndex : Number.MAX_SAFE_INTEGER;
     }
     case "projectName":
-    case "strategyName":
     case "collateral":
     case "notes":
       return String(entry[key] || "");
+    case "strategyName":
+      return entry.type === "strategy" ? String(entry.currency || entry.strategyName || "") : String(entry.strategyName || "");
     case "maturityDate": {
       const maturityDate = parsePositionDate(entry.maturityDate);
       return maturityDate ? maturityDate.getTime() : 0;
@@ -991,7 +1364,7 @@ function renderActiveTable() {
         <td>${escapeHtml(row.wallet)}</td>
         <td>${escapeHtml(row.chain)}</td>
         <td>${escapeHtml(row.projectName)}</td>
-        ${showLending ? `<td>${escapeHtml(row.collateral || "-")}</td>` : `<td>${escapeHtml(row.strategyName)}</td>`}
+        ${showLending ? `<td>${escapeHtml(row.collateral || "-")}</td>` : `<td>${escapeHtml(row.type === "strategy" ? row.currency || row.strategyName : row.strategyName)}</td>`}
         <td>${showLending ? formatAssetAmount(Number(row.investedAmount || 0), row.collateral) : formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${showLending ? formatAssetAmount(Number(row.currentValue || 0), row.collateral) : formatCurrency(Number(row.currentValue || 0))}</td>
         ${showLending ? "" : `<td>${formatCurrency(Number(row.interestAmount || 0))}</td>`}
@@ -1043,7 +1416,7 @@ function renderArchivedTable() {
         <td>${escapeHtml(row.wallet)}</td>
         <td>${escapeHtml(row.chain)}</td>
         <td>${escapeHtml(row.projectName)}</td>
-        <td>${escapeHtml(row.strategyName)}</td>
+        <td>${escapeHtml(row.type === "strategy" ? row.currency || row.strategyName : row.strategyName)}</td>
         <td>${formatCurrency(Number(row.investedAmount || 0))}</td>
         <td>${formatCurrency(Number(row.currentValue || 0))}</td>
         <td>${formatCurrency(Number(row.interestAmount || 0))}</td>
@@ -1112,6 +1485,7 @@ function setActiveTab(nextTab) {
     sortState.active.key = null;
   }
   updateActiveTableColumns();
+  updateStrategyColumnLabel();
   updatePositionCountLabel();
   updateSortUi();
   renderActiveTable();
@@ -1156,6 +1530,10 @@ function resetFormMode() {
   chainInput.value = DEFAULT_CHAIN;
   dateInput.value = localDateTimeNowHour();
   syncTypeSpecificFields(activeTab);
+  if (activeTab === "strategy" && currencyInput) {
+    currencyInput.value = DEFAULT_STRATEGY_CURRENCY;
+    updateAmountLabels("strategy");
+  }
   syncCalculationInputs();
   setFormMode(false);
 }
@@ -1220,7 +1598,15 @@ currentInput.addEventListener("input", () => {
 });
 
 collateralInput?.addEventListener("change", () => {
-  updateLendingAmountLabels();
+  if (activeTab === "lending") {
+    updateAmountLabels("lending");
+  }
+});
+
+currencyInput?.addEventListener("change", () => {
+  if (activeTab === "strategy") {
+    updateAmountLabels("strategy");
+  }
 });
 
 sortableHeaders.forEach((header) => {
@@ -1265,6 +1651,7 @@ form.addEventListener("submit", (event) => {
     chain: chainInput.value,
     projectName: projectInput.value.trim(),
     strategyName: strategyNameInput.value.trim(),
+    currency: "",
     investedAmount: Number(investedInput.value),
     interestAmount: 0,
     currentValue: 0,
@@ -1326,9 +1713,16 @@ form.addEventListener("submit", (event) => {
       }
       next.borrowPayout = borrowPayout;
     }
+  } else if (next.type === "strategy") {
+    next.currency = currencyInput?.value.trim() || "";
+    next.strategyName = next.currency;
+    if (!next.currency) {
+      setStatus("Waehrung ist fuer klassische Yield Strategien erforderlich.");
+      return;
+    }
   }
 
-  if (next.type !== "lending" && !next.strategyName) {
+  if (next.type === "pendle" && !next.strategyName) {
     setStatus("Name der Strategie ist erforderlich.");
     return;
   }
@@ -1411,7 +1805,7 @@ form.addEventListener("submit", (event) => {
     setStatus("Position aktualisiert.");
   } else {
     positions.unshift(next);
-    setStatus("Position im localStorage des Browsers gespeichert.");
+    setStatus("Position gespeichert.");
   }
 
   savePositions();
@@ -1442,6 +1836,9 @@ tableBody.addEventListener("click", (event) => {
     chainInput.value = position.chain;
     projectInput.value = position.projectName;
     strategyNameInput.value = position.strategyName;
+    if (currencyInput) {
+      currencyInput.value = position.currency || position.strategyName || DEFAULT_STRATEGY_CURRENCY;
+    }
     ptAmountInput.value = position.ptAmount === null || position.ptAmount === undefined ? "" : String(position.ptAmount);
     maturityInput.value = normalizeDateTimeValue(position.maturityDate || "") || "";
     if (collateralInput) {
@@ -1466,7 +1863,11 @@ tableBody.addEventListener("click", (event) => {
     syncCalculationInputs();
     setFormMode(true);
     setStatus("Position wird bearbeitet.");
-    strategyNameInput.focus();
+    if (position.type === "strategy" && currencyInput) {
+      currencyInput.focus();
+    } else {
+      strategyNameInput.focus();
+    }
     return;
   }
 
@@ -1628,11 +2029,52 @@ walletList?.addEventListener("click", (event) => {
   setWalletStatus(`Wallet "${walletName}" gelöscht.`);
 });
 
+supabaseForm?.addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (supabaseConfigSource === "runtime") {
+    setSupabaseStatus("Supabase wird per ENV-Konfiguration verwaltet.");
+    return;
+  }
+  const url = supabaseUrlInput?.value.trim() || "";
+  const anonKey = supabaseAnonKeyInput?.value.trim() || "";
+
+  if (!url || !anonKey) {
+    setSupabaseStatus("Supabase URL und Anon Key sind erforderlich.", true);
+    return;
+  }
+
+  const nextConfig = {
+    url,
+    anonKey,
+    savedAt: new Date().toISOString(),
+    lastCheckedAt: null
+  };
+  const saved = writeSupabaseConfig(nextConfig);
+  if (!saved) {
+    setSupabaseStatus("Supabase Konfiguration konnte nicht gespeichert werden.", true);
+    return;
+  }
+
+  supabaseClient = createSupabaseClient(nextConfig);
+  updateSupabaseMeta(nextConfig);
+  setSupabaseStatus("Supabase Konfiguration gespeichert. Jetzt Verbindung testen.");
+});
+
+supabaseTestButton?.addEventListener("click", () => {
+  testSupabaseConnection();
+});
+
+supabaseSchemaButton?.addEventListener("click", () => {
+  validateSupabaseSchema();
+});
+
 loadWallets();
 loadPositions();
+initializeSupabaseSettings();
 setPage(activePage);
 resetFormMode();
 render();
 updateActiveTableColumns();
+updateStrategyColumnLabel();
 updateSortUi();
 console.log("DEF-66 wallet rename update loaded");

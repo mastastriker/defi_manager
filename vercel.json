@@ -1,4 +1,6 @@
 {
+  "buildCommand": "bash scripts/write-supabase-config-from-env.sh",
+  "outputDirectory": ".",
   "rewrites": [
     {
       "source": "/((?!.*\\.).*)",

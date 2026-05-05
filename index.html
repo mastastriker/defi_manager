@@ -15,7 +15,22 @@
       <p class="subtitle">
         Einseitiges Dashboard zur manuellen DeFi-Positionsverwaltung über Kreditvergabe, Pendle PT und Strategiebücher.
       </p>
-      <p class="meta-note">Nur lokaler Modus. Keine Wallet-Authentifizierung, Analysen oder externen Integrationen in v1.</p>
+      <p
+        id="version-info"
+        style="
+          margin: 0.7rem 0 0;
+          width: fit-content;
+          border: 1px solid rgba(53, 200, 255, 0.35);
+          border-radius: 999px;
+          background: rgba(16, 45, 70, 0.48);
+          color: #d7ecff;
+          font-size: 0.8rem;
+          letter-spacing: 0.02em;
+          padding: 0.3rem 0.58rem;
+        "
+      >
+        Release V1.1 | Storage v2
+      </p>
     </header>
 
     <nav class="shell top-nav" aria-label="Seitennavigation">
@@ -60,7 +75,7 @@
               <select id="position-wallet" required></select>
             </label>
             <label>
-              Chains
+              Chain
               <select id="position-chain" required>
                 <option value="ETH">ETH</option>
                 <option value="ARB">ARB</option>
@@ -73,11 +88,21 @@
               <input id="position-project" type="text" maxlength="48" placeholder="Pendle" />
             </label>
             <label id="position-strategy-name-field">
-              Name der Strategie
+              <span id="position-strategy-name-label">Name der Strategie</span>
               <input id="position-strategy-name" type="text" maxlength="80" placeholder="PT-ETH Dec 2026" required />
             </label>
+            <label id="position-currency-field">
+              Währung
+              <select id="position-currency">
+                <option value="ETH">ETH</option>
+                <option value="BTC">BTC</option>
+                <option value="stETH">stETH</option>
+                <option value="USDC">USDC</option>
+                <option value="DAI">DAI</option>
+              </select>
+            </label>
             <label id="position-maturity-field">
-              Maturity (nur PT)
+              Fälligkeit (nur PT)
               <input id="position-maturity" type="datetime-local" step="3600" />
             </label>
             <label id="position-pt-amount-field">
@@ -99,7 +124,7 @@
               <input id="position-invested" type="number" min="0" step="0.00000001" placeholder="100000" required />
             </label>
             <label id="position-interest-field">
-              Zinsen (USD)
+              <span id="position-interest-label">Zinsen (USD)</span>
               <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
             </label>
             <label id="position-current-field">
@@ -107,11 +132,11 @@
               <input id="position-current" type="number" min="0" step="0.00000001" placeholder="102500" />
             </label>
             <label id="position-debt-field">
-              Borrow Schulden (nur Lending/Borrow)
+              <span id="position-debt-label">Borrow Schulden (USD, nur Lending/Borrow)</span>
               <input id="position-debt" type="number" min="0" step="0.01" placeholder="25000" />
             </label>
             <label id="position-borrow-payout-field">
-              Borrow Ausgezahlt (nur Lending/Borrow)
+              <span id="position-borrow-payout-label">Borrow Ausgezahlt (USD, nur Lending/Borrow)</span>
               <input id="position-borrow-payout" type="number" min="0" step="0.01" placeholder="24800" />
             </label>
             <label id="position-notes-field" class="span-full">
@@ -162,7 +187,7 @@
                   </th>
                   <th id="active-strategy-name-header" data-sort-table="active" data-sort-key="strategyName" aria-sort="none">
                     <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="strategyName">
-                      Name der Strategie
+                      <span id="active-strategy-column-label">Name der Strategie</span>
                       <span class="sort-indicator" aria-hidden="true"></span>
                     </button>
                   </th>
@@ -401,9 +426,33 @@
           <p id="wallet-status" class="form-status" role="status" aria-live="polite"></p>
           <ul id="wallet-list" class="wallet-list"></ul>
         </section>
+        <section class="panel" aria-label="Supabase Verbindung">
+          <h2>Supabase Verbindung</h2>
+          <p class="meta-note">Supabase URL und Anon Key speichern und Verbindung testen.</p>
+          <form id="supabase-form" class="wallet-form">
+            <label>
+              Supabase URL
+              <input id="supabase-url" type="url" placeholder="https://xyzcompany.supabase.co" required />
+            </label>
+            <label>
+              Supabase Anon Key
+              <input id="supabase-anon-key" type="password" placeholder="eyJhbGciOi..." required />
+            </label>
+            <button type="submit" class="btn-primary">Supabase speichern</button>
+          </form>
+          <div class="supabase-actions">
+            <button id="supabase-test-btn" type="button" class="wallet-action-btn">Verbindung testen</button>
+            <button id="supabase-schema-btn" type="button" class="wallet-action-btn">Schema prüfen</button>
+            <p id="supabase-meta" class="wallet-count-wrap"></p>
+          </div>
+          <p id="supabase-status" class="form-status" role="status" aria-live="polite"></p>
+          <pre id="supabase-debug" class="supabase-debug" hidden></pre>
+        </section>
       </section>
     </main>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.local.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
