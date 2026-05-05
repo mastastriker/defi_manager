@@ -14,8 +14,22 @@
         <p class="muted">Bitte einloggen, um deine Depots zu verwalten.</p>
 
         <div id="auth-mode-tabs" class="row gap">
-          <button id="show-login-btn" class="btn-secondary" type="button">Login</button>
-          <button id="show-register-btn" class="btn-secondary" type="button">Registrieren</button>
+          <button
+            id="show-login-btn"
+            class="btn-secondary"
+            type="button"
+            onclick="document.getElementById('login-form').classList.remove('hidden');document.getElementById('register-form').classList.add('hidden');"
+          >
+            Login
+          </button>
+          <button
+            id="show-register-btn"
+            class="btn-secondary"
+            type="button"
+            onclick="document.getElementById('register-form').classList.remove('hidden');document.getElementById('login-form').classList.add('hidden');"
+          >
+            Registrieren
+          </button>
         </div>
 
         <form id="login-form" class="stack">
