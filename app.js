@@ -1,5 +1,17 @@
-const SUPABASE_URL = window.__PAPERCLIP_SUPABASE_URL__ || window.PAPERCLIP_SUPABASE_URL;
-const SUPABASE_ANON_KEY = window.__PAPERCLIP_SUPABASE_ANON_KEY__ || window.PAPERCLIP_SUPABASE_ANON_KEY;
+function readSupabaseRuntimeConfig() {
+  const fromDirect = {
+    url: window.__PAPERCLIP_SUPABASE_URL__ || window.PAPERCLIP_SUPABASE_URL,
+    anonKey: window.__PAPERCLIP_SUPABASE_ANON_KEY__ || window.PAPERCLIP_SUPABASE_ANON_KEY
+  };
+  if (fromDirect.url && fromDirect.anonKey) {
+    return fromDirect;
+  }
+
+  const fromLegacyConfig = window.__DEFI_MANAGER_CONFIG__ || {};
+  const url = fromLegacyConfig.supabaseUrl || fromLegacyConfig.url || "";
+  const anonKey = fromLegacyConfig.supabaseAnonKey || fromLegacyConfig.anonKey || "";
+  return { url, anonKey };
+}
 
 let supabase = null;
 let currentUser = null;
@@ -27,11 +39,12 @@ function formatUsd(v) {
 }
 
 function requireSupabase() {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const config = readSupabaseRuntimeConfig();
+  if (!config.url || !config.anonKey) {
     setStatus(authStatus, "Supabase ENV fehlt: PAPERCLIP_SUPABASE_URL / PAPERCLIP_SUPABASE_ANON_KEY", true);
     return false;
   }
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  supabase = window.supabase.createClient(config.url, config.anonKey);
   return true;
 }
 
