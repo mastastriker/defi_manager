@@ -242,17 +242,50 @@ function closeDialog(id) {
   document.getElementById(id).close();
 }
 
+function forceCloseAllDialogs() {
+  document.querySelectorAll("dialog").forEach((dialog) => {
+    try {
+      dialog.removeAttribute("open");
+      if (typeof dialog.close === "function") {
+        dialog.close();
+      }
+    } catch (_error) {
+      // Ignore and continue; this is a defensive startup cleanup.
+    }
+  });
+}
+
 function wireEvents() {
-  document.getElementById("show-login-btn").addEventListener("click", () => {
+  const showLoginBtn = document.getElementById("show-login-btn");
+  const showRegisterBtn = document.getElementById("show-register-btn");
+  const loginFormEl = document.getElementById("login-form");
+  const registerFormEl = document.getElementById("register-form");
+  const forgotPasswordBtn = document.getElementById("forgot-password-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const newPortfolioBtn = document.getElementById("new-portfolio-btn");
+  const portfolioCancelBtn = document.getElementById("portfolio-cancel");
+  const newWalletBtn = document.getElementById("new-wallet-btn");
+  const walletCancelBtn = document.getElementById("wallet-cancel");
+  const positionCancelBtn = document.getElementById("position-cancel");
+  const portfolioFormEl = document.getElementById("portfolio-form");
+  const walletFormEl = document.getElementById("wallet-form");
+  const positionFormEl = document.getElementById("position-form");
+
+  if (!showLoginBtn || !showRegisterBtn || !loginFormEl || !registerFormEl) {
+    setStatus(authStatus, "UI konnte nicht initialisiert werden. Bitte Seite neu laden.", true);
+    return;
+  }
+
+  showLoginBtn.addEventListener("click", () => {
     document.getElementById("login-form").classList.remove("hidden");
     document.getElementById("register-form").classList.add("hidden");
   });
-  document.getElementById("show-register-btn").addEventListener("click", () => {
+  showRegisterBtn.addEventListener("click", () => {
     document.getElementById("register-form").classList.remove("hidden");
     document.getElementById("login-form").classList.add("hidden");
   });
 
-  document.getElementById("login-form").addEventListener("submit", async (event) => {
+  loginFormEl.addEventListener("submit", async (event) => {
     event.preventDefault();
     const email = document.getElementById("login-email").value.trim();
     const password = document.getElementById("login-password").value;
@@ -266,7 +299,7 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("register-form").addEventListener("submit", async (event) => {
+  registerFormEl.addEventListener("submit", async (event) => {
     event.preventDefault();
     const email = document.getElementById("register-email").value.trim();
     const password = document.getElementById("register-password").value;
@@ -286,7 +319,7 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("forgot-password-btn").addEventListener("click", async () => {
+  forgotPasswordBtn?.addEventListener("click", async () => {
     const email = document.getElementById("login-email").value.trim();
     if (!email) {
       setStatus(authStatus, "Bitte zuerst Email im Login-Feld eintragen", true);
@@ -301,7 +334,7 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("logout-btn").addEventListener("click", async () => {
+  logoutBtn?.addEventListener("click", async () => {
     await supabase.auth.signOut();
   });
 
@@ -310,12 +343,12 @@ function wireEvents() {
     renderView();
   });
 
-  document.getElementById("new-portfolio-btn").addEventListener("click", () => {
+  newPortfolioBtn?.addEventListener("click", () => {
     document.getElementById("portfolio-dialog").showModal();
   });
-  document.getElementById("portfolio-cancel").addEventListener("click", () => closeDialog("portfolio-dialog"));
+  portfolioCancelBtn?.addEventListener("click", () => closeDialog("portfolio-dialog"));
 
-  document.getElementById("portfolio-form").addEventListener("submit", async (event) => {
+  portfolioFormEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const name = document.getElementById("portfolio-name").value.trim();
     if (!name) return;
@@ -329,12 +362,12 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("new-wallet-btn").addEventListener("click", () => {
+  newWalletBtn?.addEventListener("click", () => {
     document.getElementById("wallet-dialog").showModal();
   });
-  document.getElementById("wallet-cancel").addEventListener("click", () => closeDialog("wallet-dialog"));
+  walletCancelBtn?.addEventListener("click", () => closeDialog("wallet-dialog"));
 
-  document.getElementById("wallet-form").addEventListener("submit", async (event) => {
+  walletFormEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const name = document.getElementById("wallet-name").value.trim();
     const portfolioId = walletPortfolioSelect.value;
@@ -349,8 +382,8 @@ function wireEvents() {
     }
   });
 
-  document.getElementById("position-cancel").addEventListener("click", () => closeDialog("position-dialog"));
-  document.getElementById("position-form").addEventListener("submit", async (event) => {
+  positionCancelBtn?.addEventListener("click", () => closeDialog("position-dialog"));
+  positionFormEl?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const id = document.getElementById("position-id").value || null;
     const walletId = document.getElementById("position-wallet-id").value;
@@ -419,5 +452,6 @@ function wireEvents() {
   });
 }
 
+forceCloseAllDialogs();
 wireEvents();
 bootstrapAuth();

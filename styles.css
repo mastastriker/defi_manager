@@ -33,6 +33,7 @@ button { cursor: pointer; }
 .btn-primary { background: #1f8f7d; border-color: #1f8f7d; }
 .btn-secondary { background: #1a3550; }
 .btn-link { background: transparent; border: none; color: #7ecbff; text-align: left; padding: 0; }
+.btn-primary, .btn-secondary, .btn-link { pointer-events: auto; }
 .status { min-height: 1.2rem; color: var(--muted); }
 .status.error { color: var(--danger); }
 .muted { color: var(--muted); margin: 0.2rem 0 0; }
