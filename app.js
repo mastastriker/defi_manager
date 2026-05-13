@@ -129,14 +129,12 @@ const currentInput = document.getElementById("position-current");
 const notesField = document.getElementById("position-notes-field");
 const notesInput = document.getElementById("position-notes");
 const formStatus = document.getElementById("form-status");
-const appShell = document.getElementById("app-shell");
-const authGate = document.getElementById("auth-gate");
-const authStatus = document.getElementById("auth-status");
-const loginForm = document.getElementById("login-form");
-const registerForm = document.getElementById("register-form");
-const showLoginBtn = document.getElementById("show-login-btn");
-const showRegisterBtn = document.getElementById("show-register-btn");
-const logoutBtn = document.getElementById("logout-btn");
+let authStatus = document.getElementById("auth-status");
+let loginForm = document.getElementById("login-form");
+let registerForm = document.getElementById("register-form");
+let showLoginBtn = document.getElementById("show-login-btn");
+let showRegisterBtn = document.getElementById("show-register-btn");
+let logoutBtn = document.getElementById("logout-btn");
 const tableBody = document.getElementById("positions-body");
 const archivedBody = document.getElementById("archived-body");
 const tabs = Array.from(document.querySelectorAll(".tab"));
@@ -202,6 +200,39 @@ function setAuthStatus(message, isError = false) {
   if (!authStatus) return;
   authStatus.textContent = message || "";
   authStatus.style.color = isError ? "#ffb4b4" : "#bdd8ff";
+}
+
+function ensureAuthUi() {
+  if (loginForm && registerForm && showLoginBtn && showRegisterBtn && logoutBtn && authStatus) return;
+  const wrapper = document.createElement("aside");
+  wrapper.id = "auth-overlay";
+  wrapper.style.cssText =
+    "position:fixed;right:12px;bottom:12px;z-index:9999;background:#0f141f;border:1px solid #29435f;border-radius:12px;padding:10px;max-width:320px;color:#dbe9ff;font:12px/1.4 system-ui,sans-serif;";
+  wrapper.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      <button id="show-login-btn" type="button">Login</button>
+      <button id="show-register-btn" type="button">Registrieren</button>
+      <button id="logout-btn" type="button" style="display:none;">Logout</button>
+    </div>
+    <form id="login-form">
+      <input id="login-email" type="email" placeholder="Email" required style="width:100%;margin-bottom:6px;" />
+      <input id="login-password" type="password" placeholder="Passwort" minlength="6" required style="width:100%;margin-bottom:6px;" />
+      <button type="submit">Einloggen</button>
+    </form>
+    <form id="register-form" style="display:none;">
+      <input id="register-email" type="email" placeholder="Email" required style="width:100%;margin-bottom:6px;" />
+      <input id="register-password" type="password" placeholder="Passwort" minlength="6" required style="width:100%;margin-bottom:6px;" />
+      <button type="submit">Registrieren</button>
+    </form>
+    <p id="auth-status" style="margin:8px 0 0 0;"></p>
+  `;
+  document.body.appendChild(wrapper);
+  authStatus = document.getElementById("auth-status");
+  loginForm = document.getElementById("login-form");
+  registerForm = document.getElementById("register-form");
+  showLoginBtn = document.getElementById("show-login-btn");
+  showRegisterBtn = document.getElementById("show-register-btn");
+  logoutBtn = document.getElementById("logout-btn");
 }
 
 async function loadRemoteState() {
@@ -1720,10 +1751,11 @@ walletList?.addEventListener("click", (event) => {
 });
 
 async function initializeAuthGate() {
+  ensureAuthUi();
+
   const config = readSupabaseRuntimeConfig();
   if (!config.url || !config.anonKey || !window.supabase?.createClient) {
     setAuthStatus("Supabase Konfiguration fehlt. Bitte supabase-config.local.js prüfen.", true);
-    if (appShell) appShell.hidden = false;
     return;
   }
 
@@ -1732,7 +1764,6 @@ async function initializeAuthGate() {
   const applySession = async (session) => {
     supabaseUser = session?.user || null;
     if (supabaseUser) {
-      if (appShell) appShell.hidden = false;
       if (logoutBtn) logoutBtn.style.display = "inline-flex";
       setAuthStatus(`Eingeloggt als ${supabaseUser.email}`);
       await loadRemoteState();
@@ -1740,7 +1771,6 @@ async function initializeAuthGate() {
       return;
     }
 
-    if (appShell) appShell.hidden = true;
     if (logoutBtn) logoutBtn.style.display = "none";
     setAuthStatus("Bitte einloggen.");
   };
@@ -1752,46 +1782,45 @@ async function initializeAuthGate() {
   supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     await applySession(session);
   });
+  showLoginBtn?.addEventListener("click", () => {
+    if (loginForm) loginForm.style.display = "";
+    if (registerForm) registerForm.style.display = "none";
+  });
+
+  showRegisterBtn?.addEventListener("click", () => {
+    if (registerForm) registerForm.style.display = "";
+    if (loginForm) loginForm.style.display = "none";
+  });
+
+  loginForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!supabaseClient) return;
+    const email = document.getElementById("login-email")?.value?.trim() || "";
+    const password = document.getElementById("login-password")?.value || "";
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) setAuthStatus(error.message, true);
+  });
+
+  registerForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!supabaseClient) return;
+    const email = document.getElementById("register-email")?.value?.trim() || "";
+    const password = document.getElementById("register-password")?.value || "";
+    const { error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) {
+      setAuthStatus(error.message, true);
+      return;
+    }
+    setAuthStatus("Registrierung erfolgreich. Bitte jetzt einloggen.");
+    if (loginForm) loginForm.style.display = "";
+    if (registerForm) registerForm.style.display = "none";
+  });
+
+  logoutBtn?.addEventListener("click", async () => {
+    if (!supabaseClient) return;
+    await supabaseClient.auth.signOut();
+  });
 }
-
-showLoginBtn?.addEventListener("click", () => {
-  if (loginForm) loginForm.style.display = "";
-  if (registerForm) registerForm.style.display = "none";
-});
-
-showRegisterBtn?.addEventListener("click", () => {
-  if (registerForm) registerForm.style.display = "";
-  if (loginForm) loginForm.style.display = "none";
-});
-
-loginForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!supabaseClient) return;
-  const email = document.getElementById("login-email")?.value?.trim() || "";
-  const password = document.getElementById("login-password")?.value || "";
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if (error) setAuthStatus(error.message, true);
-});
-
-registerForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!supabaseClient) return;
-  const email = document.getElementById("register-email")?.value?.trim() || "";
-  const password = document.getElementById("register-password")?.value || "";
-  const { error } = await supabaseClient.auth.signUp({ email, password });
-  if (error) {
-    setAuthStatus(error.message, true);
-    return;
-  }
-  setAuthStatus("Registrierung erfolgreich. Bitte jetzt einloggen.");
-  if (loginForm) loginForm.style.display = "";
-  if (registerForm) registerForm.style.display = "none";
-});
-
-logoutBtn?.addEventListener("click", async () => {
-  if (!supabaseClient) return;
-  await supabaseClient.auth.signOut();
-});
 
 loadWallets();
 loadPositions();
