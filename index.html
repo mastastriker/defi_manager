@@ -10,7 +10,7 @@
     <div class="bg-glow bg-glow-a" aria-hidden="true"></div>
     <div class="bg-glow bg-glow-b" aria-hidden="true"></div>
 
-    <header class="hero shell">
+    <header id="app-hero" class="hero shell" hidden>
       <h1>DeFi-Portfolio-Manager</h1>
       <p class="subtitle">
         Einseitiges Dashboard zur manuellen DeFi-Positionsverwaltung über Kreditvergabe, Pendle PT und Strategiebücher.
@@ -38,7 +38,7 @@
       <p id="auth-status" class="form-status" role="status" aria-live="polite"></p>
     </section>
 
-    <nav class="shell top-nav" aria-label="Seitennavigation">
+    <nav id="app-nav" class="shell top-nav" aria-label="Seitennavigation" hidden>
       <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
       <button type="button" class="page-tab" data-page-target="archive">Archiv</button>
       <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
@@ -432,6 +432,8 @@
       (function () {
         const authGate = document.getElementById("auth-gate");
         const appShell = document.getElementById("app-shell");
+        const appHero = document.getElementById("app-hero");
+        const appNav = document.getElementById("app-nav");
         const loginForm = document.getElementById("login-form");
         const registerForm = document.getElementById("register-form");
         const logoutBtn = document.getElementById("logout-btn");
@@ -455,6 +457,8 @@
             if (loginForm) loginForm.style.display = "none";
             if (registerForm) registerForm.style.display = "none";
             if (logoutBtn) logoutBtn.style.display = "inline-flex";
+            if (appHero) appHero.hidden = false;
+            if (appNav) appNav.hidden = false;
             if (appShell) appShell.hidden = false;
             if (authStatus) authStatus.textContent = "Eingeloggt als " + (user.email || user.id);
             return;
@@ -463,6 +467,8 @@
           if (loginForm) loginForm.style.display = "";
           if (registerForm) registerForm.style.display = "none";
           if (logoutBtn) logoutBtn.style.display = "none";
+          if (appHero) appHero.hidden = true;
+          if (appNav) appNav.hidden = true;
           if (appShell) appShell.hidden = true;
           if (authStatus) authStatus.textContent = "Bitte einloggen.";
         }

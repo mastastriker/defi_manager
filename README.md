@@ -40,6 +40,12 @@ Schema anwenden:
 -- scripts/sql/defi_manager_schema_v1.sql
 ```
 
+Alle Daten zuruecksetzen (DEF-112):
+
+```sql
+-- scripts/sql/def-112_reset_data.sql
+```
+
 Demo-Daten anwenden:
 
 ```sql
