@@ -18,13 +18,33 @@
       <p class="meta-note">Nur lokaler Modus. Keine Wallet-Authentifizierung, Analysen oder externen Integrationen in v1.</p>
     </header>
 
+    <section id="auth-gate" class="shell panel" style="margin-bottom: 0.9rem">
+      <h2>Login</h2>
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.6rem;">
+        <button id="show-login-btn" type="button" class="btn-primary">Login</button>
+        <button id="show-register-btn" type="button" class="wallet-action-btn">Registrieren</button>
+        <button id="logout-btn" type="button" class="wallet-action-btn" style="display:none;">Logout</button>
+      </div>
+      <form id="login-form" class="wallet-form">
+        <label>Email<input id="login-email" type="email" required /></label>
+        <label>Passwort<input id="login-password" type="password" minlength="6" required /></label>
+        <button type="submit" class="btn-primary">Einloggen</button>
+      </form>
+      <form id="register-form" class="wallet-form" style="display:none;">
+        <label>Email<input id="register-email" type="email" required /></label>
+        <label>Passwort<input id="register-password" type="password" minlength="6" required /></label>
+        <button type="submit" class="btn-primary">Registrieren</button>
+      </form>
+      <p id="auth-status" class="form-status" role="status" aria-live="polite"></p>
+    </section>
+
     <nav class="shell top-nav" aria-label="Seitennavigation">
       <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
       <button type="button" class="page-tab" data-page-target="archive">Archiv</button>
       <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
     </nav>
 
-    <main class="shell">
+    <main class="shell" id="app-shell" hidden>
       <section id="dashboard-page" class="page-section is-active" aria-label="Dashboard">
         <section class="panel" aria-label="Portfolio-KPI-Übersicht">
           <h2>Portfolio-KPI-Übersicht</h2>
