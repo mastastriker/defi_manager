@@ -1,129 +1,61 @@
-# DeFi Portfolio Dashboard - DEF-9 MVP
+# DeFi Depot Verwaltung (DEF-111)
 
-This repository implements DEF-9 board-scoped v1:
+Diese Version implementiert:
+- Supabase Auth (Login, Registrierung, Logout, Session Guard)
+- Depotverwaltung mit `portfolios`, `wallets`, `positions`
+- Gesamtansicht (alle Depots) und Einzeldepot-Ansicht
+- Wallet- und Position-CRUD pro Depot
 
-- Dark, minimal, single-page dashboard
-- Hero + KPI summary + positions table (strict scope)
-- Manual position entry only
-- Supabase-only persistence for wallets and positions
-- Wallet management page with add/delete and dropdown selection in position form
-- No auth, analytics, alerts, or transactions in v1
+## Setup
 
-## Run locally
-
-Option 1 (Python):
+1. Starte lokal einen Static Server:
 
 ```bash
 python3 -m http.server 4173
 ```
 
-Option 2 (Node):
-
-```bash
-npx serve . -l 4173
-```
-
-Open: `http://localhost:4173`
-
-## Supabase via Paperclip ENV (DEF-106)
-
-If you do not want to enter keys in the web UI, use runtime config from environment variables:
-
-1. Store these secrets in Paperclip for this agent/workspace:
-   - `PAPERCLIP_SUPABASE_URL`
-   - `PAPERCLIP_SUPABASE_ANON_KEY`
-2. Generate local runtime config file:
+2. Stelle ENV Runtime Config bereit:
 
 ```bash
 ./scripts/write-supabase-config-from-env.sh
 ```
 
-3. Start/reload the app. It auto-loads `supabase-config.local.js`.
-4. Open `Wallets` -> `Supabase Verbindung` and click `Verbindung testen`.
-5. Apply the DEF-108 relational schema once in Supabase SQL editor:
+Benötigte Variablen:
+- `NEXT_PUBLIC_SUPABASE_URL` (empfohlen in Vercel/Next.js)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (empfohlen in Vercel/Next.js)
 
-```sql
--- copy contents of scripts/sql/defi_manager_schema_v1.sql
-```
-This script migrates legacy `defi_manager_state.payload` data into relational tables (`wallets`, `positions`) and removes the old blob table.
-
-Notes:
-- `supabase-config.local.js` is gitignored and stays local.
-- The sample template is `supabase-config.local.sample.js`.
-- Use only the public **anon key** in frontend context, never service role keys.
-- DEF-108 relational target tables: `public.wallets`, `public.positions`.
-- Database structure details: `docs/database-structure-def-108.md`
-
-## Vercel Runtime Config
-
-For browser-over-browser consistency in production, set these Vercel environment variables:
-
+Alternativ werden weiterhin unterstützt:
+- `NEXT_PUBLIC_PAPERCLIP_SUPABASE_URL`
+- `NEXT_PUBLIC_PAPERCLIP_SUPABASE_ANON_KEY`
 - `PAPERCLIP_SUPABASE_URL`
 - `PAPERCLIP_SUPABASE_ANON_KEY`
 
-`vercel.json` runs `scripts/write-supabase-config-from-env.sh` during build, which generates `supabase-config.local.js` for all clients.
+3. Öffne `http://localhost:4173`.
 
-## Manual-entry and persistence flow
+## Datenbank
 
-1. Use the `Manual Position Entry` form to add a position (date/time with hour precision).
-2. Wallets are selected from the managed wallet dropdown (`Cash1` and `Cash2` defaults).
-3. Enter exactly one value: either `Zinsen (USD)` or `Aktueller Wert (USD)`.
-4. The other value is calculated automatically (`Aktueller Wert = Eingezahlt + Zinsen` / `Zinsen = Aktueller Wert - Eingezahlt`).
-5. Position appears in the table and KPI totals update immediately.
-6. Reload the page.
-7. Previously entered positions remain (loaded from Supabase row `defi_manager_state.id='global'`).
-8. Delete a row to remove it and persist the removal.
+Schema anwenden:
 
-## Wallet flow (DEF-55 / DEF-66)
+```sql
+-- scripts/sql/defi_manager_schema_v1.sql
+```
 
-1. Open `Wallets` page in top navigation (next to `Archiv`).
-2. Add a wallet via `Wallet-Name`.
-3. Rename a wallet via `Bearbeiten` and confirm the new name appears in wallet dropdown and existing positions.
-4. Delete wallets only when they are not used by existing positions.
-5. Return to `Dashboard` and confirm wallet dropdown includes new wallets.
+Alle Daten zuruecksetzen (DEF-112):
 
-## Archive flow (DEF-30)
+```sql
+-- scripts/sql/def-112_reset_data.sql
+```
 
-1. On `Dashboard`, click `Archivieren` on an active row.
-2. Confirm the row disappears from active table + KPI aggregation.
-3. Switch to `Archiv` page via top navigation.
-4. Confirm archived row appears with archive timestamp.
-5. Click `Wiederherstellen` and verify it returns to `Dashboard` active table.
-6. Reload page and verify active/archive separation persists in Supabase.
+Demo-Daten anwenden:
 
-## Verification notes
+```sql
+-- scripts/sql/defi_manager_demo_seed.sql
+```
 
-- Verified table tab filters: `All`, `Lending`, `Pendle PT`, `Strategies`.
-- Verified sortable columns in active and archive tables (all data columns with asc/desc toggle).
-- Verified KPI summary recomputes on add/delete actions.
-- Verified KPI `Durchschnittliches APY` is calculated with `((1 + monatlicher Cashflow / aktueller Gesamtwert)^12 - 1)`.
-- Verified APY per position is derived from observed monthly cashflow and compounded to 12 months (`(1 + Monatsrate)^12 - 1`).
-- Verified date/time (`datetime-local`, hourly) is shown and stored in hour precision and APY/cashflow annualization uses elapsed hours.
-- Verified migration behavior: app can load legacy array payloads and new versioned payloads without dropping positions.
+Wichtig: Der Auth User `demo@example.com` muss vorher in Supabase Auth angelegt sein (Passwort `demo123`).
 
-## Vercel deployment notes (GitHub auto deploy)
+## Hinweise
 
-1. Push this branch to GitHub repository `mastastriker/defi_manager`.
-2. In Vercel, import the GitHub repository.
-3. Framework preset: `Other` (static site), build command: none, output directory: `.`.
-4. Enable automatic deployments from the connected branch/PR.
-5. PR preview URLs are generated by Vercel automatically for each pushed commit.
-
-## Branch governance (DEF-63)
-
-- Verbindliche v1/main Branch-Strategie: [docs/git-branch-strategy-v1.md](docs/git-branch-strategy-v1.md)
-- Verbindliche Sofort-Push-Regel (DEF-65): kein Zurueckhalten lokaler Commits, Nachweis je PR im Template
-- Verbindlicher CEO-Code-Owner: `.github/CODEOWNERS` (`@mastastriker`)
-- PR-Checkliste: `.github/pull_request_template.md`
-- Automatische Branch-Gate-Pruefung: `.github/workflows/branch-strategy-gate.yml`
-
-## Operational notes
-
-- DEF-101 (2026-04-24): validated required development-branch commit/push workflow on `codex/v1.1`.
-
-## Deferred for later scope
-
-- Wallet connection and protocol API integration
-- Authentication and user accounts
-- Alerts and transaction history modules
-- Analytics instrumentation
+- `user_id` wird durch Supabase Auth + RLS kontrolliert.
+- Frontend nutzt nur Supabase Client API, kein raw SQL.
+- Ansichten und Summen werden aus Supabase Daten berechnet.

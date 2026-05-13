@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>DeFi-Portfolio-Manager | Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-glow bg-glow-a" aria-hidden="true"></div>
+    <div class="bg-glow bg-glow-b" aria-hidden="true"></div>
+
+    <header id="app-hero" class="hero shell" hidden>
+      <h1>DeFi-Portfolio-Manager</h1>
+      <p class="subtitle">
+        Dashboard zur manuellen DeFi-Positionsverwaltung über Kreditvergabe, Pendle PT und Strategiebücher.
+      </p>
+      <p class="meta-note">Nur lokaler Modus. Keine Wallet-Authentifizierung, Analysen oder externen Integrationen in v1.</p>
+    </header>
+
+    <nav id="app-nav" class="shell top-nav" aria-label="Seitennavigation" hidden>
+      <div class="top-nav-left">
+        <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
+        <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
+      </div>
+      <div class="top-nav-right">
+        <span id="user-email-display" class="user-email-display"></span>
+        <button id="logout-btn" type="button" class="wallet-action-btn">Logout</button>
+      </div>
+    </nav>
+
+    <main class="shell" id="app-shell" hidden>
+      <section id="dashboard-page" class="page-section is-active" aria-label="Dashboard">
+        <section class="panel" aria-label="Portfolio-KPI-Übersicht">
+          <h2>Portfolio-KPI-Übersicht</h2>
+          <div class="kpi-grid">
+            <article>
+              <p class="label">Aktueller Wert gesamt</p>
+              <p id="kpi-current" class="value">$0</p>
+            </article>
+            <article>
+              <p class="label">Durchschnittliches APY</p>
+              <p id="kpi-apy" class="value">0.00%</p>
+            </article>
+            <article>
+              <p class="label">Cashflow pro Monat</p>
+              <p id="kpi-cashflow" class="value">$0</p>
+            </article>
+            <article>
+              <p class="label">Lending Kosten pro Monat</p>
+              <p id="kpi-lending-cost" class="value">$0</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="Manuelle Positionserfassung">
+          <h2>Manuelle Positionserfassung</h2>
+          <form id="position-form" class="entry-form">
+            <label>
+              Datum/Uhrzeit
+              <input id="position-date" type="datetime-local" step="3600" required />
+            </label>
+            <label>
+              Wallet
+              <select id="position-wallet" required></select>
+            </label>
+            <label>
+              Chains
+              <select id="position-chain" required>
+                <option value="ETH">ETH</option>
+                <option value="ARB">ARB</option>
+                <option value="BASE">BASE</option>
+                <option value="AVAX">AVAX</option>
+              </select>
+            </label>
+            <label>
+              Plattform
+              <input id="position-project" type="text" maxlength="48" placeholder="Pendle" />
+            </label>
+            <label id="position-strategy-name-field">
+              Name der Strategie
+              <input id="position-strategy-name" type="text" maxlength="80" placeholder="PT-ETH Dec 2026" required />
+            </label>
+            <label id="position-maturity-field">
+              Maturity (nur PT)
+              <input id="position-maturity" type="datetime-local" step="3600" />
+            </label>
+            <label id="position-pt-amount-field">
+              PT-Anzahl (nur PT)
+              <input id="position-pt-amount" type="number" min="0" step="0.000001" placeholder="12.5" />
+            </label>
+            <label id="position-collateral-field">
+              Collateral (nur Lending/Borrow)
+              <select id="position-collateral">
+                <option value="ETH">ETH</option>
+                <option value="BTC">BTC</option>
+                <option value="stETH">stETH</option>
+                <option value="USDC">USDC</option>
+                <option value="DAI">DAI</option>
+              </select>
+            </label>
+            <label id="position-invested-field">
+              <span id="position-invested-label">Eingezahlter Betrag (USD)</span>
+              <input id="position-invested" type="number" min="0" step="0.00000001" placeholder="100000" required />
+            </label>
+            <label id="position-interest-field">
+              Zinsen (USD)
+              <input id="position-interest" type="number" min="0" step="0.01" placeholder="2500" />
+            </label>
+            <label id="position-current-field">
+              <span id="position-current-label">Aktueller Wert (USD)</span>
+              <input id="position-current" type="number" min="0" step="0.00000001" placeholder="102500" />
+            </label>
+            <label id="position-debt-field">
+              Borrow Schulden (nur Lending/Borrow)
+              <input id="position-debt" type="number" min="0" step="0.01" placeholder="25000" />
+            </label>
+            <label id="position-borrow-payout-field">
+              Borrow Ausgezahlt (nur Lending/Borrow)
+              <input id="position-borrow-payout" type="number" min="0" step="0.01" placeholder="24800" />
+            </label>
+            <label id="position-notes-field" class="span-full">
+              Notizen
+              <input id="position-notes" type="text" maxlength="240" placeholder="Freitext-Notiz zur Position" />
+            </label>
+            <button type="submit" class="btn-primary">Position hinzufügen</button>
+          </form>
+          <p class="meta-note">Trage entweder Zinsen oder den aktuellen Wert ein. Das jeweils andere Feld wird automatisch berechnet.</p>
+          <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section class="panel" aria-label="Aktive Positionstabelle">
+          <h2><span id="active-table-title">Klassische Yield Strategien Tabelle</span> <span id="active-positions-total" class="heading-count">(0)</span></h2>
+          <div class="tabs" role="tablist" aria-label="Positions-Typ-Tabs">
+            <button type="button" class="tab active" data-tab="strategy" role="tab" aria-selected="true">Klassische Yield Strategien</button>
+            <button type="button" class="tab" data-tab="pendle" role="tab" aria-selected="false">PT Strategien</button>
+            <button type="button" class="tab" data-tab="lending" role="tab" aria-selected="false">Lending/Borrow Positionen</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-sort-table="active" data-sort-key="date" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="date">
+                      Datum/Uhrzeit
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="wallet" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="wallet">
+                      Wallet
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="chain" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="chain">
+                      Chain
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="projectName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="projectName">
+                      Plattform
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-strategy-name-header" data-sort-table="active" data-sort-key="strategyName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="strategyName">
+                      Name der Strategie
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-collateral-header" data-sort-table="active" data-sort-key="collateral" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="collateral">
+                      Collateral
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="investedAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="investedAmount">
+                      Eingezahlt
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="active" data-sort-key="currentValue" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="currentValue">
+                      Aktueller Wert
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-interest-header" data-sort-table="active" data-sort-key="interestAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="interestAmount">
+                      Zinsen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-roi-header" data-sort-table="active" data-sort-key="roiPercent" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="roiPercent">
+                      Aktuelles ROI in % und Dollar
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-monthly-cashflow-header" data-sort-table="active" data-sort-key="monthlyCashflow" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="monthlyCashflow">
+                      Cashflow pro Monat
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-fixed-cashflow-header" data-sort-table="active" data-sort-key="fixedMonthlyCashflow" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="fixedMonthlyCashflow">
+                      Fixed Cashflow pro Monat
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-apy-header" data-sort-table="active" data-sort-key="apyAnnual" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="apyAnnual">
+                      APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-collateral-apy-header" data-sort-table="active" data-sort-key="collateralApy" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="collateralApy">
+                      Collateral APY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-net-apy-header" data-sort-table="active" data-sort-key="netApy" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="netApy">
+                      NetAPY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-apy-header" data-sort-table="active" data-sort-key="borrowApy" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowApy">
+                      Borrow APY
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-cost-header" data-sort-table="active" data-sort-key="borrowCost" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowCost">
+                      Borrow Cost
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-debt-header" data-sort-table="active" data-sort-key="debtUsd" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="debtUsd">
+                      Borrow Schulden
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-borrow-payout-header" data-sort-table="active" data-sort-key="borrowPayout" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="borrowPayout">
+                      Borrow Ausgezahlt
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-ltv-header" data-sort-table="active" data-sort-key="ltv" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="ltv">
+                      LTV
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-pt-amount-header" data-sort-table="active" data-sort-key="ptAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="ptAmount">
+                      PT-Anzahl
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-roi-maturity-header" data-sort-table="active" data-sort-key="roiAtMaturity" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="roiAtMaturity">
+                      ROI at Maturity
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-maturity-header" data-sort-table="active" data-sort-key="maturityDate" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="maturityDate">
+                      Maturity
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th id="active-notes-header" data-sort-table="active" data-sort-key="notes" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="active" data-sort-key="notes">
+                      Notizen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody id="positions-body"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel" aria-label="Archivierte Positionen">
+          <h2>Archiv</h2>
+          <p class="meta-note">Archivierte Positionen sind jetzt direkt im Dashboard gebuendelt.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th data-sort-table="archive" data-sort-key="date" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="date">
+                      Datum/Uhrzeit
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="wallet" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="wallet">
+                      Wallet
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="chain" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="chain">
+                      Chain
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="projectName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="projectName">
+                      Plattform
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="strategyName" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="strategyName">
+                      Name der Strategie
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="investedAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="investedAmount">
+                      Eingezahlter Betrag
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="currentValue" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="currentValue">
+                      Aktueller Wert
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="interestAmount" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="interestAmount">
+                      Zinsen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="roiPercent" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="roiPercent">
+                      Aktuelles ROI in % und Dollar
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="monthlyCashflow" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="monthlyCashflow">
+                      Cashflow pro Monat
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="apyAnnual" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="apyAnnual">
+                      APY aufs Jahr gesehen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="notes" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="notes">
+                      Notizen
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th data-sort-table="archive" data-sort-key="archivedAt" aria-sort="none">
+                    <button type="button" class="sort-btn" data-sort-table="archive" data-sort-key="archivedAt">
+                      Archiviert am
+                      <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                  </th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody id="archived-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="wallets-page" class="page-section" aria-label="Walletverwaltung" hidden>
+        <section class="panel" aria-label="Wallets">
+          <div class="wallet-headline">
+            <h2>Wallets</h2>
+            <p class="wallet-count-wrap">Anzahl: <span id="wallet-count" class="wallet-count">0</span></p>
+          </div>
+          <p class="meta-note">Wallets verwalten, die in der Positionserfassung als Auswahl erscheinen.</p>
+          <form id="wallet-form" class="wallet-form">
+            <label>
+              Wallet-Name
+              <input id="wallet-name" type="text" maxlength="40" placeholder="Cash3" required />
+            </label>
+            <button type="submit" class="btn-primary">Wallet hinzufügen</button>
+          </form>
+          <p id="wallet-status" class="form-status" role="status" aria-live="polite"></p>
+          <ul id="wallet-list" class="wallet-list"></ul>
+        </section>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.local.js"></script>
+    <script src="app.js"></script>
+    <script src="relational-sync.js"></script>
+  </body>
+</html>
