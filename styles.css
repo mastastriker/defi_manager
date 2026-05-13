@@ -45,6 +45,7 @@ button { cursor: pointer; }
 .portfolio-block { border: 1px solid #2b4b67; border-radius: 12px; padding: 0.9rem; background: #0c1a2a; }
 .portfolio-head { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; }
 .wallet-block { border: 1px dashed #335a79; border-radius: 10px; padding: 0.7rem; margin-top: 0.7rem; }
+.table-wrap { overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; margin-top: 0.6rem; }
 .table th, .table td { border-bottom: 1px solid #25415a; padding: 0.45rem 0.35rem; text-align: left; }
 .table th { color: var(--muted); font-weight: 600; }

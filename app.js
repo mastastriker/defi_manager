@@ -45,6 +45,7 @@ const userEmail = document.getElementById("user-email");
 const portfolioSelect = document.getElementById("portfolio-select");
 const walletPortfolioSelect = document.getElementById("wallet-portfolio-select");
 const portfolioSections = document.getElementById("portfolio-sections");
+const legacyOverviewBody = document.getElementById("legacy-overview-body");
 
 function setStatus(el, msg, isError = false) {
   el.textContent = msg || "";
@@ -255,6 +256,49 @@ function renderView() {
   kpiPortfolioCount.textContent = String(displayPortfolios.length);
   kpiWalletCount.textContent = String(walletCount);
   kpiPositionCount.textContent = String(positionCount);
+
+  renderLegacyOverview(displayPortfolios);
+}
+
+function renderLegacyOverview(displayPortfolios) {
+  if (!legacyOverviewBody) return;
+  const visiblePortfolioIds = new Set(displayPortfolios.map((p) => p.id));
+  const walletMap = new Map(wallets.map((w) => [w.id, w]));
+  const portfolioMap = new Map(portfolios.map((p) => [p.id, p]));
+
+  const rows = positions
+    .filter((pos) => {
+      const w = walletMap.get(pos.wallet_id);
+      return w && visiblePortfolioIds.has(w.portfolio_id);
+    })
+    .map((pos) => {
+      const w = walletMap.get(pos.wallet_id);
+      const p = w ? portfolioMap.get(w.portfolio_id) : null;
+      return { pos, wallet: w, portfolio: p };
+    });
+
+  if (!rows.length) {
+    legacyOverviewBody.innerHTML = '<tr><td colspan="6" class="muted">Keine Positionen im aktuellen Kontext.</td></tr>';
+    return;
+  }
+
+  legacyOverviewBody.innerHTML = rows
+    .map(
+      ({ pos, wallet, portfolio }) => `
+      <tr>
+        <td>${portfolio?.name || "-"}</td>
+        <td>${wallet?.name || "-"}</td>
+        <td>${pos.asset_name}</td>
+        <td>${Number(pos.amount).toFixed(8)}</td>
+        <td>${formatUsd(pos.value_usd)}</td>
+        <td class="actions">
+          <button type="button" data-action="edit-position" data-position-id="${pos.id}">Bearbeiten</button>
+          <button type="button" data-action="delete-position" data-position-id="${pos.id}">Löschen</button>
+        </td>
+      </tr>
+    `
+    )
+    .join("");
 }
 
 async function createPortfolio(name) {
