@@ -22,17 +22,48 @@ create table if not exists public.wallets (
 create table if not exists public.positions (
   id uuid primary key default gen_random_uuid(),
   wallet_id uuid not null references public.wallets(id) on delete cascade,
+  type text,
+  position_date timestamptz,
+  chain text,
+  project_name text,
+  strategy_name text,
   asset_name text not null,
   amount numeric(20,8) not null,
   value_usd numeric(20,2) not null,
+  collateral text,
+  debt_usd numeric(20,2),
+  borrow_payout numeric(20,2),
+  maturity_date timestamptz,
+  pt_amount numeric(20,8),
+  notes text,
+  status text default 'active',
+  archived_at timestamptz,
+  calculation_mode text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.positions add column if not exists type text;
+alter table public.positions add column if not exists position_date timestamptz;
+alter table public.positions add column if not exists chain text;
+alter table public.positions add column if not exists project_name text;
+alter table public.positions add column if not exists strategy_name text;
+alter table public.positions add column if not exists collateral text;
+alter table public.positions add column if not exists debt_usd numeric(20,2);
+alter table public.positions add column if not exists borrow_payout numeric(20,2);
+alter table public.positions add column if not exists maturity_date timestamptz;
+alter table public.positions add column if not exists pt_amount numeric(20,8);
+alter table public.positions add column if not exists notes text;
+alter table public.positions add column if not exists status text default 'active';
+alter table public.positions add column if not exists archived_at timestamptz;
+alter table public.positions add column if not exists calculation_mode text;
 
 create index if not exists idx_portfolios_user_id on public.portfolios(user_id);
 create index if not exists idx_wallets_portfolio_id on public.wallets(portfolio_id);
 create index if not exists idx_wallets_user_id on public.wallets(user_id);
 create index if not exists idx_positions_wallet_id on public.positions(wallet_id);
+create index if not exists idx_positions_status on public.positions(status);
+create index if not exists idx_positions_position_date on public.positions(position_date desc);
 
 create or replace function public.set_updated_at_timestamp()
 returns trigger
