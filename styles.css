@@ -94,8 +94,21 @@ main {
 
 .top-nav {
   display: flex;
-  gap: 0.55rem;
+  justify-content: space-between;
+  align-items: center;
   margin: 0 auto 0.8rem;
+}
+
+.top-nav-left,
+.top-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.user-email-display {
+  color: #bdd8ff;
+  font-size: 0.86rem;
 }
 
 .page-tab {

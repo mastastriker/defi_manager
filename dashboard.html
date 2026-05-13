@@ -19,8 +19,14 @@
     </header>
 
     <nav id="app-nav" class="shell top-nav" aria-label="Seitennavigation" hidden>
-      <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
-      <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
+      <div class="top-nav-left">
+        <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
+        <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
+      </div>
+      <div class="top-nav-right">
+        <span id="user-email-display" class="user-email-display"></span>
+        <button id="logout-btn" type="button" class="wallet-action-btn">Logout</button>
+      </div>
     </nav>
 
     <main class="shell" id="app-shell" hidden>

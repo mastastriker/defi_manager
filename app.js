@@ -74,6 +74,7 @@ let registerForm = document.getElementById("register-form");
 let showLoginBtn = document.getElementById("show-login-btn");
 let showRegisterBtn = document.getElementById("show-register-btn");
 let logoutBtn = document.getElementById("logout-btn");
+const userEmailDisplay = document.getElementById("user-email-display");
 const appHero = document.getElementById("app-hero");
 const appNav = document.getElementById("app-nav");
 const appShell = document.getElementById("app-shell");
@@ -1673,6 +1674,9 @@ async function initializeAuthGate() {
       }
       setAppVisibility(true);
       if (logoutBtn) logoutBtn.style.display = "inline-flex";
+      if (userEmailDisplay) {
+        userEmailDisplay.textContent = supabaseUser.email || supabaseUser.id || "";
+      }
       setAuthStatus(`Eingeloggt als ${supabaseUser.email}`);
       loadWallets();
       loadPositions();
@@ -1689,6 +1693,9 @@ async function initializeAuthGate() {
     positions = [];
     render();
     if (logoutBtn) logoutBtn.style.display = "none";
+    if (userEmailDisplay) {
+      userEmailDisplay.textContent = "";
+    }
     if (hasAuthGate) {
       setAuthStatus("Bitte einloggen.");
     }
