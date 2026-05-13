@@ -72,6 +72,9 @@ let registerForm = document.getElementById("register-form");
 let showLoginBtn = document.getElementById("show-login-btn");
 let showRegisterBtn = document.getElementById("show-register-btn");
 let logoutBtn = document.getElementById("logout-btn");
+const appHero = document.getElementById("app-hero");
+const appNav = document.getElementById("app-nav");
+const appShell = document.getElementById("app-shell");
 const tableBody = document.getElementById("positions-body");
 const archivedBody = document.getElementById("archived-body");
 const tabs = Array.from(document.querySelectorAll(".tab"));
@@ -170,6 +173,12 @@ function ensureAuthUi() {
   showLoginBtn = document.getElementById("show-login-btn");
   showRegisterBtn = document.getElementById("show-register-btn");
   logoutBtn = document.getElementById("logout-btn");
+}
+
+function setAppVisibility(isAuthenticated) {
+  if (appHero) appHero.hidden = !isAuthenticated;
+  if (appNav) appNav.hidden = !isAuthenticated;
+  if (appShell) appShell.hidden = !isAuthenticated;
 }
 
 function queueRemoteSync() {
@@ -1653,6 +1662,7 @@ async function initializeAuthGate() {
   const applySession = async (session) => {
     supabaseUser = session?.user || null;
     if (supabaseUser) {
+      setAppVisibility(true);
       if (logoutBtn) logoutBtn.style.display = "inline-flex";
       setAuthStatus(`Eingeloggt als ${supabaseUser.email}`);
       loadWallets();
@@ -1661,6 +1671,7 @@ async function initializeAuthGate() {
       return;
     }
 
+    setAppVisibility(false);
     wallets = [];
     positions = [];
     render();
@@ -1723,6 +1734,7 @@ loadWallets();
 loadPositions();
 setPage(activePage);
 resetFormMode();
+setAppVisibility(false);
 render();
 updateActiveTableColumns();
 updateSortUi();
