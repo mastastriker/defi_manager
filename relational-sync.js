@@ -83,12 +83,12 @@
     return select;
   }
 
-  function mapDbPositionToLocal(row, walletName) {
-    return {
+function mapDbPositionToLocal(row, walletName) {
+  return {
       id: row.id,
       type: row.type || "strategy",
       date: row.position_date ? new Date(row.position_date).toISOString().slice(0, 16) : "",
-      wallet: walletName,
+      wallet: walletName || "",
       chain: row.chain || "ETH",
       projectName: row.project_name || "",
       strategyName: row.strategy_name || "",
@@ -127,17 +127,18 @@
         .in("wallet_id", walletIds)
         .order("position_date", { ascending: false });
       if (!rowsError) {
-        positions = (rows || []).map((row) => mapDbPositionToLocal(row, walletById.get(row.wallet_id) || "Cash1"));
+        positions = (rows || []).map((row) => mapDbPositionToLocal(row, walletById.get(row.wallet_id) || ""));
       }
     }
 
-    localStorage.setItem(STORAGE_KEYS.wallets, JSON.stringify(walletNames.length ? walletNames : ["Cash1", "Cash2"]));
+    localStorage.setItem(STORAGE_KEYS.wallets, JSON.stringify(walletNames));
     localStorage.setItem(
       STORAGE_KEYS.primary,
       JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), positions })
     );
     localStorage.setItem(STORAGE_KEYS.legacy, JSON.stringify(positions));
     localStorage.setItem(STORAGE_KEYS.backup, JSON.stringify(positions));
+    window.dispatchEvent(new CustomEvent("defi:local-state-updated"));
   }
 
   async function upsertRelationalFromLocal() {
@@ -217,7 +218,13 @@
     if (!legacyRow || !legacyRow.payload) return;
 
     const payload = legacyRow.payload;
-    const walletNames = Array.isArray(payload.wallets) && payload.wallets.length ? payload.wallets : ["Cash1", "Cash2"];
+    const positionWallets = Array.isArray(payload.positions)
+      ? payload.positions.map((entry) => String(entry?.wallet || "").trim()).filter(Boolean)
+      : [];
+    const walletNames = Array.from(
+      new Set([...(Array.isArray(payload.wallets) ? payload.wallets.map((entry) => String(entry || "").trim()) : []), ...positionWallets])
+    ).filter(Boolean);
+    if (walletNames.length === 0) return;
     const { data: insertedWallets } = await client
       .from("wallets")
       .insert(walletNames.map((name) => ({ user_id: currentUser.id, portfolio_id: portfolioId, name: String(name) })))

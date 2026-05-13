@@ -5,7 +5,6 @@ const STORAGE_KEYS = {
 };
 const WALLET_STORAGE_KEY = "defi-dashboard-wallets-v1";
 const STORAGE_VERSION = 2;
-const DEFAULT_WALLETS = ["Cash1", "Cash2"];
 
 const TYPE_LABELS = {
   lending: "Lending/Borrow Positionen",
@@ -26,67 +25,6 @@ const DEFAULT_CHAIN = "ETH";
 const MS_PER_HOUR = 1000 * 60 * 60;
 const HOURS_PER_YEAR = 365.25 * 24;
 const HOURS_PER_MONTH = HOURS_PER_YEAR / 12;
-const REMOTE_STATE_TABLE = "user_dashboard_state";
-
-const initialPositions = [
-  {
-    id: crypto.randomUUID(),
-    type: "lending",
-    date: "2026-01-10T09:00",
-    wallet: "Cash1",
-    chain: "ETH",
-    projectName: "Aave",
-    strategyName: "USDC Lending Core",
-    collateral: "stETH",
-    investedAmount: 910000,
-    interestAmount: 18000,
-    currentValue: 928000,
-    debtUsd: 250000,
-    borrowPayout: 246500,
-    calculationMode: "interest",
-    ptAmount: null,
-    maturityDate: null,
-    notes: "Blue-chip lending baseline",
-    status: "active",
-    archivedAt: null
-  },
-  {
-    id: crypto.randomUUID(),
-    type: "pendle",
-    date: "2026-02-14T13:00",
-    wallet: "Cash2",
-    chain: "ARB",
-    projectName: "Pendle",
-    strategyName: "PT-ETH Dec 2026",
-    investedAmount: 310000,
-    interestAmount: 24500,
-    currentValue: 334500,
-    calculationMode: "interest",
-    ptAmount: 12.5,
-    maturityDate: "2026-12-31T16:00",
-    notes: "Seasonal convexity thesis",
-    status: "active",
-    archivedAt: null
-  },
-  {
-    id: crypto.randomUUID(),
-    type: "strategy",
-    date: "2026-03-02T11:00",
-    wallet: "Cash1",
-    chain: "BASE",
-    projectName: "Morpho",
-    strategyName: "Stablecoin Basis Loop",
-    investedAmount: 220000,
-    interestAmount: 9500,
-    currentValue: 229500,
-    calculationMode: "interest",
-    ptAmount: null,
-    maturityDate: null,
-    notes: "Low-vol carry",
-    status: "active",
-    archivedAt: null
-  }
-];
 
 let positions = [];
 let wallets = [];
@@ -95,7 +33,6 @@ let editingPositionId = null;
 let activePage = "dashboard";
 let supabaseClient = null;
 let supabaseUser = null;
-let remoteSyncQueue = Promise.resolve();
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -235,55 +172,8 @@ function ensureAuthUi() {
   logoutBtn = document.getElementById("logout-btn");
 }
 
-async function loadRemoteState() {
-  if (!supabaseClient || !supabaseUser) return;
-  const { data, error } = await supabaseClient
-    .from(REMOTE_STATE_TABLE)
-    .select("payload")
-    .eq("user_id", supabaseUser.id)
-    .maybeSingle();
-  if (error) {
-    setStatus(`Supabase Load Fehler: ${error.message}`);
-    return;
-  }
-  if (!data?.payload) return;
-
-  const payload = data.payload;
-  if (Array.isArray(payload.wallets)) {
-    wallets = payload.wallets.map((entry) => String(entry || "").trim()).filter(Boolean);
-    if (wallets.length === 0) wallets = [...DEFAULT_WALLETS];
-  }
-  if (Array.isArray(payload.positions)) {
-    positions = payload.positions.map(normalizePosition).filter(Boolean);
-  }
-
-  saveWallets();
-  savePositions();
-  render();
-}
-
 function queueRemoteSync() {
-  if (!supabaseClient || !supabaseUser) return;
-  const payload = {
-    wallets,
-    positions,
-    updatedAt: new Date().toISOString()
-  };
-  remoteSyncQueue = remoteSyncQueue
-    .then(() =>
-      supabaseClient.from(REMOTE_STATE_TABLE).upsert(
-        {
-          user_id: supabaseUser.id,
-          payload,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: "user_id" }
-      )
-    )
-    .then(({ error }) => {
-      if (error) setStatus(`Supabase Sync Fehler: ${error.message}`);
-    })
-    .catch((error) => setStatus(`Supabase Sync Fehler: ${error.message}`));
+  // Relational sync is handled by relational-sync.js.
 }
 
 function formatCurrency(value) {
@@ -532,8 +422,7 @@ function setWalletStatus(message) {
 function loadWallets() {
   const raw = readStorage(WALLET_STORAGE_KEY);
   if (!raw) {
-    wallets = [...DEFAULT_WALLETS];
-    saveWallets();
+    wallets = [];
     return;
   }
 
@@ -543,12 +432,10 @@ function loadWallets() {
       throw new Error("Wallet payload invalid");
     }
     const cleaned = parsed.map((entry) => String(entry || "").trim()).filter((entry) => entry.length > 0);
-    wallets = cleaned.length > 0 ? cleaned : [...DEFAULT_WALLETS];
+    wallets = cleaned;
   } catch (_error) {
-    wallets = [...DEFAULT_WALLETS];
+    wallets = [];
   }
-
-  saveWallets();
 }
 
 function saveWallets() {
@@ -572,7 +459,7 @@ function parseStoredPositions(raw) {
 }
 
 function fallbackWallet() {
-  return wallets[0] || DEFAULT_WALLETS[0];
+  return wallets[0] || "";
 }
 
 function loadPositions() {
@@ -596,8 +483,7 @@ function loadPositions() {
     }
   }
 
-  positions = [...initialPositions];
-  savePositions();
+  positions = [];
 }
 
 function savePositions() {
@@ -1193,6 +1079,9 @@ function render() {
   renderArchivedTable();
   renderWalletSelect();
   renderWalletList();
+  if (supabaseUser && positions.length === 0) {
+    setStatus("Keine Daten vorhanden.");
+  }
 }
 
 function setActiveTab(nextTab) {
@@ -1766,11 +1655,15 @@ async function initializeAuthGate() {
     if (supabaseUser) {
       if (logoutBtn) logoutBtn.style.display = "inline-flex";
       setAuthStatus(`Eingeloggt als ${supabaseUser.email}`);
-      await loadRemoteState();
+      loadWallets();
+      loadPositions();
       render();
       return;
     }
 
+    wallets = [];
+    positions = [];
+    render();
     if (logoutBtn) logoutBtn.style.display = "none";
     setAuthStatus("Bitte einloggen.");
   };
@@ -1819,6 +1712,10 @@ async function initializeAuthGate() {
   logoutBtn?.addEventListener("click", async () => {
     if (!supabaseClient) return;
     await supabaseClient.auth.signOut();
+    writeStorage(STORAGE_KEYS.primary, "");
+    writeStorage(STORAGE_KEYS.legacy, "");
+    writeStorage(STORAGE_KEYS.backup, "");
+    writeStorage(WALLET_STORAGE_KEY, "");
   });
 }
 
@@ -1830,3 +1727,9 @@ render();
 updateActiveTableColumns();
 updateSortUi();
 initializeAuthGate();
+
+window.addEventListener("defi:local-state-updated", () => {
+  loadWallets();
+  loadPositions();
+  render();
+});
