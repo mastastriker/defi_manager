@@ -18,13 +18,33 @@
       <p class="meta-note">Nur lokaler Modus. Keine Wallet-Authentifizierung, Analysen oder externen Integrationen in v1.</p>
     </header>
 
+    <section id="auth-gate" class="shell panel" style="margin-bottom: 0.9rem">
+      <h2>Login</h2>
+      <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:.6rem;">
+        <button id="show-login-btn" type="button" class="btn-primary">Login</button>
+        <button id="show-register-btn" type="button" class="wallet-action-btn">Registrieren</button>
+        <button id="logout-btn" type="button" class="wallet-action-btn" style="display:none;">Logout</button>
+      </div>
+      <form id="login-form" class="wallet-form">
+        <label>Email<input id="login-email" type="email" required /></label>
+        <label>Passwort<input id="login-password" type="password" minlength="6" required /></label>
+        <button type="submit" class="btn-primary">Einloggen</button>
+      </form>
+      <form id="register-form" class="wallet-form" style="display:none;">
+        <label>Email<input id="register-email" type="email" required /></label>
+        <label>Passwort<input id="register-password" type="password" minlength="6" required /></label>
+        <button type="submit" class="btn-primary">Registrieren</button>
+      </form>
+      <p id="auth-status" class="form-status" role="status" aria-live="polite"></p>
+    </section>
+
     <nav class="shell top-nav" aria-label="Seitennavigation">
       <button type="button" class="page-tab active" data-page-target="dashboard" aria-current="page">Dashboard</button>
       <button type="button" class="page-tab" data-page-target="archive">Archiv</button>
       <button type="button" class="page-tab" data-page-target="wallets">Wallets</button>
     </nav>
 
-    <main class="shell">
+    <main class="shell" id="app-shell" hidden>
       <section id="dashboard-page" class="page-section is-active" aria-label="Dashboard">
         <section class="panel" aria-label="Portfolio-KPI-Übersicht">
           <h2>Portfolio-KPI-Übersicht</h2>
@@ -407,5 +427,65 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.local.js"></script>
     <script src="app.js"></script>
+    <script>
+      (function () {
+        const authGate = document.getElementById("auth-gate");
+        const appShell = document.getElementById("app-shell");
+        const loginForm = document.getElementById("login-form");
+        const registerForm = document.getElementById("register-form");
+        const logoutBtn = document.getElementById("logout-btn");
+        const authStatus = document.getElementById("auth-status");
+        const loginEmail = document.getElementById("login-email");
+        const loginPassword = document.getElementById("login-password");
+        const registerEmail = document.getElementById("register-email");
+        const registerPassword = document.getElementById("register-password");
+
+        function readConfig() {
+          const cfg = window.__DEFI_MANAGER_CONFIG__ || {};
+          return {
+            url: cfg.supabaseUrl || window.NEXT_PUBLIC_SUPABASE_URL || window.PAPERCLIP_SUPABASE_URL || "",
+            anonKey: cfg.supabaseAnonKey || window.NEXT_PUBLIC_SUPABASE_ANON_KEY || window.PAPERCLIP_SUPABASE_ANON_KEY || ""
+          };
+        }
+
+        function setUi(session) {
+          const user = session && session.user ? session.user : null;
+          if (user) {
+            if (loginForm) loginForm.style.display = "none";
+            if (registerForm) registerForm.style.display = "none";
+            if (logoutBtn) logoutBtn.style.display = "inline-flex";
+            if (appShell) appShell.hidden = false;
+            if (authStatus) authStatus.textContent = "Eingeloggt als " + (user.email || user.id);
+            return;
+          }
+
+          if (loginForm) loginForm.style.display = "";
+          if (registerForm) registerForm.style.display = "none";
+          if (logoutBtn) logoutBtn.style.display = "none";
+          if (appShell) appShell.hidden = true;
+          if (authStatus) authStatus.textContent = "Bitte einloggen.";
+        }
+
+        function clearLocalState() {
+          const keys = [
+            "defi-dashboard-positions-v2",
+            "defi-dashboard-positions-v1",
+            "defi-dashboard-positions-backup-v1",
+            "defi-dashboard-wallets-v1"
+          ];
+          keys.forEach((key) => localStorage.removeItem(key));
+        }
+
+        const config = readConfig();
+        if (!config.url || !config.anonKey || !window.supabase || !window.supabase.createClient) return;
+        const client = window.supabase.createClient(config.url, config.anonKey);
+
+        client.auth.getSession().then(({ data }) => setUi(data && data.session ? data.session : null));
+        client.auth.onAuthStateChange(function (_event, session) {
+          if (!session) clearLocalState();
+          setUi(session || null);
+        });
+      })();
+    </script>
   </body>
 </html>
