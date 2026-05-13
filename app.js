@@ -82,9 +82,9 @@ const pageTabs = Array.from(document.querySelectorAll(".page-tab"));
 const sortableHeaders = Array.from(document.querySelectorAll("th[data-sort-table][data-sort-key]"));
 const pageSections = {
   dashboard: document.getElementById("dashboard-page"),
-  archive: document.getElementById("archive-page"),
   wallets: document.getElementById("wallets-page")
 };
+const validPages = new Set(Object.keys(pageSections));
 const walletForm = document.getElementById("wallet-form");
 const walletNameInput = document.getElementById("wallet-name");
 const walletList = document.getElementById("wallet-list");
@@ -1138,10 +1138,10 @@ function setActiveTab(nextTab) {
 }
 
 function setPage(nextPage) {
-  activePage = nextPage;
+  activePage = validPages.has(nextPage) ? nextPage : "dashboard";
 
   pageTabs.forEach((tab) => {
-    const isActive = tab.dataset.pageTarget === nextPage;
+    const isActive = tab.dataset.pageTarget === activePage;
     tab.classList.toggle("active", isActive);
     if (isActive) {
       tab.setAttribute("aria-current", "page");
@@ -1154,7 +1154,7 @@ function setPage(nextPage) {
     if (!section) {
       return;
     }
-    const isVisible = pageName === nextPage;
+    const isVisible = pageName === activePage;
     section.hidden = !isVisible;
     section.classList.toggle("is-active", isVisible);
   });
