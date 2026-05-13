@@ -1735,12 +1735,12 @@ loadPositions();
 setPage(activePage);
 resetFormMode();
 setAppVisibility(false);
-render();
 updateActiveTableColumns();
 updateSortUi();
 initializeAuthGate();
 
 window.addEventListener("defi:local-state-updated", () => {
+  if (!supabaseUser) return;
   loadWallets();
   loadPositions();
   render();
