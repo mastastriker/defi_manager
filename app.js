@@ -33,6 +33,8 @@ let editingPositionId = null;
 let activePage = "dashboard";
 let supabaseClient = null;
 let supabaseUser = null;
+const pathName = window.location.pathname || "/";
+const isDashboardPage = pathName.endsWith("/dashboard.html");
 const sortState = {
   active: { key: null, direction: "asc" },
   archive: { key: null, direction: "asc" }
@@ -1649,7 +1651,10 @@ walletList?.addEventListener("click", (event) => {
 });
 
 async function initializeAuthGate() {
-  ensureAuthUi();
+  const hasAuthGate = !!document.getElementById("auth-gate");
+  if (hasAuthGate) {
+    ensureAuthUi();
+  }
 
   const config = readSupabaseRuntimeConfig();
   if (!config.url || !config.anonKey || !window.supabase?.createClient) {
@@ -1662,6 +1667,10 @@ async function initializeAuthGate() {
   const applySession = async (session) => {
     supabaseUser = session?.user || null;
     if (supabaseUser) {
+      if (hasAuthGate) {
+        window.location.href = "/dashboard.html";
+        return;
+      }
       setAppVisibility(true);
       if (logoutBtn) logoutBtn.style.display = "inline-flex";
       setAuthStatus(`Eingeloggt als ${supabaseUser.email}`);
@@ -1672,11 +1681,17 @@ async function initializeAuthGate() {
     }
 
     setAppVisibility(false);
+    if (isDashboardPage) {
+      window.location.href = "/";
+      return;
+    }
     wallets = [];
     positions = [];
     render();
     if (logoutBtn) logoutBtn.style.display = "none";
-    setAuthStatus("Bitte einloggen.");
+    if (hasAuthGate) {
+      setAuthStatus("Bitte einloggen.");
+    }
   };
 
   const { data, error } = await supabaseClient.auth.getSession();
